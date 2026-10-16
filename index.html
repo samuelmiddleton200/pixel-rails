@@ -1670,7 +1670,7 @@ function drawMap(){
     tx = lerp(X(p[k]), X(p[k + 1]), r); ty = lerp(Y(p[k]), Y(p[k + 1]), r); }
   // a little steam engine (with a puff of smoke) facing the way you're going
   const right = G.trip ? X(G.trip.to) >= X(G.trip.from) : true;
-  const sp = right ? MAP_TRAIN[0] : MAP_TRAIN[1], bob = G.trip && Math.floor(performance.now() / 250) % 2 ? 1 : 0;
+  const sp = right ? MAP_TRAIN[0] : MAP_TRAIN[1], bob = 0;
   g.drawImage(sp, Math.round(tx) - (sp.width >> 1), Math.round(ty) - sp.height - bob);
   // labels (HTML, crisp)
   box.querySelectorAll('.lbl').forEach(l => l.remove());
