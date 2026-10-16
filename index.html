@@ -1549,6 +1549,19 @@ $('#panel').addEventListener('click', e => {
 });
 
 // ---- the map ----
+// map marker: a tiny red-and-black engine, plus a mirrored copy for heading west
+const MAP_TRAIN = (() => {
+  const a = outlined(mk(14, 11, g => {
+    P(g, '#ececf2', 9, 0, 3, 2); P(g, '#ffffff', 10, 0, 1, 1); P(g, '#ececf2', 6, 1, 2, 1);      // smoke
+    P(g, '#b8322f', 0, 3, 5, 6); P(g, '#3a2a2a', 0, 2, 6, 1); P(g, '#ffe39a', 1, 4, 3, 2);         // cab + window
+    P(g, '#2b2d3a', 5, 5, 8, 4); P(g, '#4a4e63', 5, 5, 8, 1); P(g, '#b8322f', 8, 5, 1, 4);         // boiler
+    P(g, '#2b2d3a', 10, 2, 2, 3); P(g, '#d6a83c', 7, 4, 2, 1); P(g, '#ffe680', 13, 5, 1, 2);        // stack, dome, lamp
+    P(g, '#24150f', 1, 9, 2, 2); P(g, '#24150f', 6, 9, 3, 2); P(g, '#24150f', 10, 9, 3, 2);        // wheels
+    P(g, '#9aa0ab', 7, 9, 1, 1); P(g, '#9aa0ab', 11, 9, 1, 1);
+  }));
+  const b = mk(a.width, a.height, g => { g.translate(a.width, 0); g.scale(-1, 1); g.drawImage(a, 0, 0); });
+  return [a, b];
+})();
 // lower 48 outline and the Great Lakes, as [lon, lat]
 const US = [[-124.7,48.4],[-123,49],[-95.2,49],[-95.2,49.4],[-94.8,48.7],[-89.6,48],[-84.8,46.5],[-84.4,45.9],[-83.5,46],[-82.5,45.3],[-82.4,43],[-83.1,42],[-79,42.9],
   [-79.2,43.4],[-76.3,43.6],[-75,44.9],[-71.5,45],[-70.6,45.5],[-69.2,47.4],[-67.8,47.1],[-67.8,45.7],[-67,44.8],[-68.8,44.3],[-70.2,43.6],[-70.8,42.9],[-70.6,42.6],
@@ -1599,7 +1612,11 @@ function drawMap(){
   if (G.town){ tx = X(G.town); ty = Y(G.town); }
   else { const T = G.trip, f = (T.seg + T.el / segTime()) / T.segs, p = T.path, n = p.length - 1, kf = Math.min(n - 1e-6, f * n), k = Math.floor(kf), r = kf - k;
     tx = lerp(X(p[k]), X(p[k + 1]), r); ty = lerp(Y(p[k]), Y(p[k + 1]), r); }
-  P(g, '#24150f', Math.round(tx) - 3, Math.round(ty) - 7, 7, 5); P(g, '#ffd166', Math.round(tx) - 2, Math.round(ty) - 6, 5, 3);
+  // a little steam engine (with a puff of smoke) facing the way you're going
+  const right = G.trip ? X(G.trip.to) >= X(G.trip.from) : true;
+  const sp = right ? MAP_TRAIN[0] : MAP_TRAIN[1], bob = G.trip && Math.floor(performance.now() / 250) % 2 ? 1 : 0;
+  g.imageSmoothingEnabled = false;
+  g.drawImage(sp, Math.round(tx) - sp.width, Math.round(ty) - sp.height * 2 - 1 - bob, sp.width * 2, sp.height * 2);
   // labels (HTML, crisp)
   box.querySelectorAll('.lbl').forEach(l => l.remove());
   for (const t of TOWNS){
