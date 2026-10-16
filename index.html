@@ -111,6 +111,7 @@ img.px{image-rendering:pixelated}
 #where .mi{margin-left:8px;font-size:13px;color:#7a5a3c}
 #pauseBtn{cursor:pointer;font:700 14px var(--px);padding:3px 10px 4px}
 #pauseBtn.on{background:#ffd166}
+#pauseBtn[hidden]{display:none}
 #pausedBanner{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);background:rgba(42,26,20,.85);color:#ffd166;border:3px solid #ffd166;border-radius:10px;padding:8px 22px;font:700 26px var(--px);text-align:center;pointer-events:none}
 #pausedBanner small{display:block;font:600 13px var(--body);color:#fbe7b5;margin-top:2px}
 #pausedBanner[hidden]{display:none}
@@ -381,6 +382,7 @@ function save(){ if (!G) return; G.wall = Date.now(); try { localStorage.setItem
 function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && (g.v === 3 || g.v === 4)){
       if (g.fuel == null){ g.fuel = LOCOS[g.train.loco].tank; delete g.freeCoal; if (g.trip && g.trip.fuel == null) g.trip.fuel = 0; }
       if (g.v === 3){ g.v = 4; delete g.tod; if (g.trip){ const T = g.trip; T.path = [T.path[0], T.path[1]]; T.to = T.path[1]; T.miles = legMiles(T.from, T.to); T.hours = T.miles / LOCOS[g.train.loco].mph; T.secs = T.hours * SEC_PER_HOUR; T.seg = Math.min(T.seg, T.segs - 1); } }
+      g.train.cars.sort((a, b) => ['tender', 'luxury', 'coach', 'dining', 'casino', 'freight', 'smug'].indexOf(a) - ['tender', 'luxury', 'coach', 'dining', 'casino', 'freight', 'smug'].indexOf(b));
       return g; } } } catch (e) {} return null; }
 
 // ---- prices ----
@@ -395,6 +397,8 @@ function noteSeen(t){ const p = {}; for (const g of GOODS) p[g.id] = [buyP(t, g.
 
 // ---- train numbers ----
 const loco = () => LOCOS[G.train.loco];
+const CAR_ORDER = ['tender', 'luxury', 'coach', 'dining', 'casino', 'freight', 'smug'];
+const sortCars = () => G.train.cars.sort((a, b) => CAR_ORDER.indexOf(a) - CAR_ORDER.indexOf(b));   // luxury rides up front so its passengers stay on screen
 const capOf = () => G.train.cars.reduce((s, c) => s + (c === 'freight' ? CARS.freight.cap : 0), 0);
 const hideCap = () => G.train.cars.filter(c => c === 'smug').length * CARS.smug.cap;
 const seatsOf = () => G.train.cars.filter(c => c === 'coach').length * CARS.coach.seats;
@@ -1608,7 +1612,7 @@ $('#panel').addEventListener('click', e => {
     case 'kick': { const k = G.pax.find(q => q.id === +x); if (!k) break; const cost = k.n * (k.cls === 'rich' ? 50 : 25); if (G.money < cost) break;
       G.money -= cost; G.pax.splice(G.pax.indexOf(k), 1); toast(`${k.n} passenger${k.n > 1 ? 's' : ''} kicked off. Refunded ${fmt(cost)}`, 'r'); break; }
     case 'repair': { const cost = Math.ceil((100 - G.train.cond) * 3.2); if (G.money >= cost){ G.money -= cost; G.train.cond = 100; toast('Good as new!', 'g'); } break; }
-    case 'buycar': { const c = CARS[x]; if (G.money >= c.price && G.train.cars.length < loco().cars){ G.money -= c.price; if (x === 'tender') G.train.cars.unshift(x); else G.train.cars.push(x); toast(`${c.n} coupled on!`, 'g'); if (V.stationTown) V.placeStation(); } break; }
+    case 'buycar': { const c = CARS[x]; if (G.money >= c.price && G.train.cars.length < loco().cars){ G.money -= c.price; G.train.cars.push(x); sortCars(); toast(`${c.n} coupled on!`, 'g'); if (V.stationTown) V.placeStation(); } break; }
     case 'sellcar': { const i = +x, c = G.train.cars[i];
       if (c === 'tender' && G.fuel > fuelCap() - CARS.tender.fuel){ toast('Burn or use the coal in it first', 'r'); break; }
       if (c === 'freight' && capOf() - CARS.freight.cap < cargoUsed()){ toast('Unload the cargo first', 'r'); break; }
@@ -1626,7 +1630,7 @@ $('#panel').addEventListener('click', e => {
     case 'reset': if (!resetArm){ resetArm = true; setTimeout(() => { resetArm = false; if (panelName === 'gear') renderPanel(); }, 3000); break; }
       resetArm = false; try { localStorage.removeItem(SAVE_KEY); } catch (e2) {} newGame(); V.x = 0; V.smoke = []; buildSprites(); V.arrive(G.town); closePanel(); save(); showNews(G.news[0].txt); return;
   }
-  save(); refreshHud(); if (panelName) renderPanel();
+  sortCars(); save(); refreshHud(); if (panelName) renderPanel();
 });
 
 // ---- the map ----
@@ -1765,7 +1769,8 @@ function drawRequestBubble(x, y){
   V.req.hit = [bx0 - 8, by0 - 8, 29, 30];
 }
 // who might want something: a car with people in it
-function riderCars(){ const out = []; G.train.cars.forEach((c, i) => { if (c === 'coach' && paxUsed('std') > G.train.cars.slice(0, i).filter(q => q === 'coach').length * 10) out.push(i); if (c === 'luxury' && paxUsed('rich') > G.train.cars.slice(0, i).filter(q => q === 'luxury').length * 6) out.push(i); }); return out; }
+const carOnScreen = i => trainFront() - sprites.loco.width - (i + 1) * (CAR_W + 3) + CAR_W / 2 > 8;
+function riderCars(){ const out = []; G.train.cars.forEach((c, i) => { if (!carOnScreen(i)) return; if (c === 'coach' && paxUsed('std') > G.train.cars.slice(0, i).filter(q => q === 'coach').length * 10) out.push(i); if (c === 'luxury' && paxUsed('rich') > G.train.cars.slice(0, i).filter(q => q === 'luxury').length * 6) out.push(i); }); return out; }
 function requestTick(dt){
   if (V.req){ if (!G.paused) V.req.life -= dt; if (V.req.life <= 0 || V.decel || !G.trip){ if (V.req.life <= 0) toast('The passenger gave up waiting.'); V.req = null; } return; }
   if (!G.trip || paused || G.paused || V.decel || !$('#modal').hidden) return;
