@@ -253,25 +253,25 @@ const GOOD = Object.fromEntries([...GOODS, CONTRA].map(g => [g.id, g]));
 // lbl = which side of the dot the name sits on the map (keeps the crowded east coast readable)
 const START = 'kans';
 const TOWNS = [
-  { id:'seat', n:'Seattle',       x:4.5,  y:4.7,  biome:'forest', prod:['lumber','coal'],    size:2, law:.3,  shop:1, roof:'#2f6d4a', lbl:'r' },
-  { id:'sanf', n:'San Francisco', x:4.4,  y:29.1, biome:'coast',  prod:['gold','luxury'],    size:3, law:.5,  bank:1, shop:1, roof:'#b8322f', lbl:'r' },
-  { id:'vega', n:'Las Vegas',     x:16.7, y:33.1, biome:'desert', prod:['whiskey'],          size:1, law:0,   shady:1, roof:'#c0563a', lbl:'r' },
-  { id:'phoe', n:'Phoenix',       x:21.9, y:39.8, biome:'desert', prod:['oranges','cotton'], size:1, law:.2,  roof:'#e08a2e', lbl:'b' },
-  { id:'albu', n:'Albuquerque',   x:31.1, y:35.8, biome:'desert', prod:['cattle','gold'],    size:1, law:.15, roof:'#b5651d', lbl:'b' },
-  { id:'denv', n:'Denver',        x:33.9, y:24.2, biome:'snow',   prod:['gold','coal'],      size:2, law:.3,  bank:1, roof:'#2e4a73', lbl:'t' },
-  { id:'kans', n:'Kansas City',   x:51.6, y:25.8, biome:'plains', prod:['cattle','grain'],   size:3, law:.35, bank:1, shop:1, roof:'#b8322f', lbl:'b' },
-  { id:'fort', n:'Fort Worth',    x:46.9, y:41.5, biome:'desert', prod:['cattle','cotton'],  size:2, law:.25, roof:'#a8322e', lbl:'b' },
-  { id:'minn', n:'Minneapolis',   x:53.8, y:11.2, biome:'snow',   prod:['grain','lumber'],   size:2, law:.25, roof:'#3f7fb8', lbl:'t' },
-  { id:'detr', n:'Detroit',       x:71.1, y:17.8, biome:'forest', prod:['iron','lumber'],    size:2, law:.35, shop:1, roof:'#5a5a6a', lbl:'t' },
-  { id:'cinc', n:'Cincinnati',    x:68.6, y:25.8, biome:'plains', prod:['grain','iron'],     size:2, law:.3,  roof:'#6a8a3a', lbl:'l' },
-  { id:'pitt', n:'Pittsburgh',    x:76.3, y:22.5, biome:'forest', prod:['iron','coal'],      size:3, law:.4,  shop:1, roof:'#3a3a4a', lbl:'br' },
-  { id:'nyc',  n:'New York',      x:86.4, y:21.8, biome:'city',   prod:['luxury','whiskey'], size:3, law:.7,  bank:1, shop:1, roof:'#6a4a8a', lbl:'r' },
-  { id:'bost', n:'Boston',        x:91.4, y:17.7, biome:'coast',  prod:['lumber','cotton'],  size:3, law:.55, bank:1, roof:'#2f4a73', lbl:'t' },
-  { id:'nash', n:'Nashville',     x:64.8, y:33.1, biome:'plains', prod:['whiskey','cattle'], size:2, law:.3,  roof:'#b5651d', lbl:'l' },
-  { id:'char', n:'Charlotte',     x:74.8, y:35.4, biome:'forest', prod:['lumber','cotton'],  size:2, law:.3,  roof:'#4a7a3a', lbl:'r' },
-  { id:'atla', n:'Atlanta',       x:68.8, y:39.1, biome:'city',   prod:['cotton','whiskey'], size:3, law:.45, bank:1, shop:1, roof:'#a8322e', lbl:'l' },
-  { id:'sava', n:'Savannah',      x:74.4, y:43.2, biome:'coast',  prod:['cotton','lumber'],  size:2, law:.25, roof:'#3f7fb8', lbl:'r' },
-  { id:'jack', n:'Jacksonville',  x:73.5, y:47.5, biome:'coast',  prod:['oranges','lumber'], size:2, law:.3,  roof:'#e08a2e', lbl:'b' },
+  { id:'seat', n:'Seattle',       x:4.5,  y:4.7,  biome:'rainforest', prod:['lumber','coal'],    size:2, law:.3,  shop:1, roof:'#2f6d4a', lbl:'r' },
+  { id:'sanf', n:'San Francisco', x:4.4,  y:29.1, biome:'baycliffs',  prod:['gold','luxury'],    size:3, law:.5,  bank:1, shop:1, roof:'#b8322f', lbl:'r' },
+  { id:'vega', n:'Las Vegas',     x:16.7, y:33.1, biome:'mojave', prod:['whiskey'],          size:1, law:0,   shady:1, roof:'#c0563a', lbl:'r' },
+  { id:'phoe', n:'Phoenix',       x:21.9, y:39.8, biome:'saguaro', prod:['oranges','cotton'], size:1, law:.2,  roof:'#e08a2e', lbl:'b' },
+  { id:'albu', n:'Albuquerque',   x:31.1, y:35.8, biome:'mesa', prod:['cattle','gold'],    size:1, law:.15, roof:'#b5651d', lbl:'b' },
+  { id:'denv', n:'Denver',        x:33.9, y:24.2, biome:'rockies',   prod:['gold','coal'],      size:2, law:.3,  bank:1, roof:'#2e4a73', lbl:'t' },
+  { id:'kans', n:'Kansas City',   x:51.6, y:25.8, biome:'prairie', prod:['cattle','grain'],   size:3, law:.35, bank:1, shop:1, roof:'#b8322f', lbl:'b' },
+  { id:'fort', n:'Fort Worth',    x:46.9, y:41.5, biome:'scrub', prod:['cattle','cotton'],  size:2, law:.25, roof:'#a8322e', lbl:'b' },
+  { id:'minn', n:'Minneapolis',   x:53.8, y:11.2, biome:'northwoods',   prod:['grain','lumber'],   size:2, law:.25, roof:'#3f7fb8', lbl:'t' },
+  { id:'detr', n:'Detroit',       x:71.1, y:17.8, biome:'greatlakes', prod:['iron','lumber'],    size:2, law:.35, shop:1, roof:'#5a5a6a', lbl:'t' },
+  { id:'cinc', n:'Cincinnati',    x:68.6, y:25.8, biome:'farmland', prod:['grain','iron'],     size:2, law:.3,  roof:'#6a8a3a', lbl:'l' },
+  { id:'pitt', n:'Pittsburgh',    x:76.3, y:22.5, biome:'steeltown', prod:['iron','coal'],      size:3, law:.4,  shop:1, roof:'#3a3a4a', lbl:'br' },
+  { id:'nyc',  n:'New York',      x:86.4, y:21.8, biome:'skyline',   prod:['luxury','whiskey'], size:3, law:.7,  bank:1, shop:1, roof:'#6a4a8a', lbl:'r' },
+  { id:'bost', n:'Boston',        x:91.4, y:17.7, biome:'harbor',  prod:['lumber','cotton'],  size:3, law:.55, bank:1, roof:'#2f4a73', lbl:'t' },
+  { id:'nash', n:'Nashville',     x:64.8, y:33.1, biome:'hills', prod:['whiskey','cattle'], size:2, law:.3,  roof:'#b5651d', lbl:'l' },
+  { id:'char', n:'Charlotte',     x:74.8, y:35.4, biome:'pines', prod:['lumber','cotton'],  size:2, law:.3,  roof:'#4a7a3a', lbl:'r' },
+  { id:'atla', n:'Atlanta',       x:68.8, y:39.1, biome:'bigcity',   prod:['cotton','whiskey'], size:3, law:.45, bank:1, shop:1, roof:'#a8322e', lbl:'l' },
+  { id:'sava', n:'Savannah',      x:74.4, y:43.2, biome:'lowcountry',  prod:['cotton','lumber'],  size:2, law:.25, roof:'#3f7fb8', lbl:'r' },
+  { id:'jack', n:'Jacksonville',  x:73.5, y:47.5, biome:'beach',  prod:['oranges','lumber'], size:2, law:.3,  roof:'#e08a2e', lbl:'b' },
 ];
 const TOWN = Object.fromEntries(TOWNS.map(t => [t.id, t]));
 // every city links to the cities near it, and no two lines of track cross
@@ -306,9 +306,9 @@ const segsFor = d => Math.max(2, Math.round(d / SEG_LEN));
 
 const LOCOS = [
   { n:'Little Rusty',    mph:30, speed:1.0,  cars:3, coal:1.0, price:0,     col:'#2b2d3a', trim:'#b8322f' },
-  { n:'Prairie Runner',  mph:40, speed:1.33, cars:4, coal:1.2, price:1800,  col:'#2d4a3a', trim:'#d6a83c' },
-  { n:'Iron Duke',       mph:50, speed:1.67,  cars:6, coal:1.5, price:6000,  col:'#3a2d4a', trim:'#d6a83c' },
-  { n:'Silver Comet',    mph:60, speed:2.0, cars:8, coal:1.8, price:18000, col:'#5a6478', trim:'#e8eef7' },
+  { n:'Prairie Runner',  mph:45, speed:1.5, cars:4, coal:1.2, price:1800,  col:'#2d4a3a', trim:'#d6a83c' },
+  { n:'Iron Duke',       mph:60, speed:2.0,  cars:6, coal:1.5, price:6000,  col:'#3a2d4a', trim:'#d6a83c' },
+  { n:'Silver Comet',    mph:85, speed:2.83, cars:8, coal:1.8, price:18000, col:'#5a6478', trim:'#e8eef7' },
 ];
 const CARS = {
   freight: { n:'Freight Car',  price:450,  cap:10,  desc:'Holds 10 crates of cargo.' },
@@ -341,7 +341,7 @@ let G = null;
 function newGame(){
   const seed = Math.floor(Math.random() * 1e9);
   R = mulberry(seed);
-  G = { v:4, seed, money:600, day:1 + 8 / 24, town:START, trip:null, cargo:{}, paid:{}, pax:[], contracts:[],
+  G = { v:4, seed, money:600, day:1 + 8 / 24, weather:{ k:'clear', until:0 }, town:START, trip:null, cargo:{}, paid:{}, pax:[], contracts:[],
     train:{ loco:0, cars:['freight','coach'], cond:100 }, crew:[], loan:0, shares:{}, events:[], news:[], mk:{}, offers:{},
     seen:{}, biz:{}, wageDays:0, freeCoal:0, wall:Date.now(), stats:{ trips:0, earned:0, best:0 }, cid:1, nextNewsDay:2 };
   // markets: every world rolls its own prices, so nobody knows the best route ahead of time
@@ -611,7 +611,7 @@ const ROAD = [
       { t:'Give them a ride', f:() => { if (Math.random() < .75){ const v = ri(15, 45); G.money += v; return `Grateful, they pay you ${fmt(v)} for the ride.`; } const v = ri(150, 300); G.money += v; return `Turns out they are a banker's daughter. Her father wires ${fmt(v)} as thanks!`; } },
       { t:'Keep going', f:() => 'You chug past. They shake a fist at the caboose.' },
     ] },
-  { w:() => 1, title:'Storm', text:() => 'Black clouds roll in and rain hammers the roof.',
+  { w:() => 1, title:'Storm', text:() => { G.weather = { k:'storm', until:G.day * 24 + 3 }; return 'Black clouds roll in, thunder cracks, and rain hammers the roof.'; },
     ch:() => [
       { t:'Slow down (lose 3 hours)', f:() => { advanceDay(3 / 24); return 'You crawl through safely.'; } },
       { t:'Push on through', f:() => { G.train.cond = clamp(G.train.cond - ri(5, 12), 0, 100); const k = cargoKeys().filter(g => ['grain','cotton','oranges'].includes(g));
@@ -823,66 +823,173 @@ const GICON = {}; [...GOODS, CONTRA].forEach(g => GICON[g.id] = goodIcon(g.id));
 const gImg = id => `<img class="px" src="${GICON[id]}" alt="">`;
 
 // =====================================================================================
-//  scenery: parallax strips per biome
+//  scenery: 19 backdrops built from pixel props, chosen by real US geography
 // =====================================================================================
-const BIOMES = {
-  plains: { sky:['#7fc4ec','#96d0f0','#aedbf3','#c7e6f6','#ddf0f8'], far:['#9fb3d6','#8a9fc6'], cap:null, hill:['#86bf62','#6aa84f'], ground:'#78b552', groundD:'#5f9a43', trees:'round', treeC:['#3f8a3e','#2f6b34','#5aa848'] },
-  forest: { sky:['#7ab8e0','#8fc4e6','#a6d0ec','#bedcf0','#d4e8f4'], far:['#8aa0c4','#7489b2'], cap:'#e8eef7', hill:['#4f8f55','#3a7444'], ground:'#4f8f45', groundD:'#3f7438', trees:'pine', treeC:['#2f5e3a','#22482c','#3f7a4a'] },
-  snow:   { sky:['#8eaee6','#a2bdec','#b6cbf0','#cbdaf4','#e0e9f8'], far:['#c9d6ee','#a8b8d8'], cap:'#ffffff', hill:['#e4ecf7','#c9d6ea'], ground:'#eef3fb', groundD:'#d2dcec', trees:'snowpine', treeC:['#2f5a4a','#22443a','#ffffff'] },
-  desert: { sky:['#f0b97c','#f4c78f','#f8d6a6','#fbe3bd','#fdeed5'], far:['#d99a68','#c4825a'], cap:null, hill:['#e8b070','#d6955a'], ground:'#e9c27d', groundD:'#d4a862', trees:'cactus', treeC:['#5a9a4a','#3f7a3a','#7ab85a'] },
-  coast:  { sky:['#78c0ec','#8ecaef','#a6d6f2','#c0e2f6','#daeefa'], far:['#a6bcd8','#90a8cc'], cap:null, hill:['#3b8fc7','#2f78b0'], sea:true, ground:'#e6cf96', groundD:'#d2b878', trees:'palm', treeC:['#3f8a3e','#2f6b34','#8a5a34'] },
-  city:   { sky:['#88a8d8','#9ab6de','#aec4e4','#c2d2ea','#d8e2f0'], far:['#9aa6c4','#8592b4'], cap:null, hill:['#7a86a4','#68738f'], ground:'#9a9ea8', groundD:'#80848e', trees:'city', treeC:['#5a6478','#4a5266','#ffe39a'] },
+// ---- props: little outlined sprites that stand on the horizon (r = seeded random) ----
+const PROP = {
+  round(r, C = ['#3f8a3e', '#2f6b34', '#5aa848']){ const R0 = 4 + Math.floor(r() * 4); return outlined(mk(R0 * 2 + 3, R0 * 2 + 8, h => { P(h, '#6a4a2a', R0, R0 + 2, 2, 7); disc(h, R0 + 1, R0 + 1, R0, C[1]); disc(h, R0, R0, R0 - 1, C[0]); disc(h, R0 - 2, R0 - 2, Math.max(1, R0 - 4), C[2]); }), OUT); },
+  autumn(r){ const S = [['#d9762b', '#b35a1e', '#f2a04a'], ['#c94a2a', '#9e3620', '#e8704a'], ['#e8b23a', '#c08a1e', '#f6d06a'], ['#6f9a3a', '#557a2c', '#8fbf4a']]; return PROP.round(r, S[Math.floor(r() * 4)]); },
+  pine(r, C = ['#2f5e3a', '#22482c'], snow = null, tall = 1){
+    const hh = Math.round((14 + r() * 10) * tall) + 6, w = Math.round(hh * (tall > 1 ? .38 : .55));
+    return outlined(mk(w, hh, h => { P(h, '#5a3a22', (w >> 1) - 1, hh - 3, 2, 3);
+      for (let y = 0; y < hh - 3; y++){ const ww = Math.max(1, Math.round((y % 6 + y / (hh - 3) * 6) / 12 * w)); P(h, C[0], (w >> 1) - (ww >> 1), y, ww, 1); P(h, C[1], (w >> 1), y, ww - (ww >> 1), 1); if (snow && y % 6 < 2) P(h, snow, (w >> 1) - (ww >> 1), y, ww, 1); } }), OUT); },
+  snowpine(r){ return PROP.pine(r, ['#2f5a4a', '#22443a'], '#ffffff'); },
+  fir(r){ return PROP.pine(r, ['#1f4a32', '#163a26'], null, 1.6); },
+  birch(r){ const hh = 16 + Math.floor(r() * 8); return outlined(mk(11, hh, h => { P(h, '#eeeae0', 4, 5, 2, hh - 5); for (let y = 7; y < hh; y += 3) P(h, '#2a2a2a', 4 + (y % 2), y, 1, 1); disc(h, 5, 4, 4, '#7ab84a'); disc(h, 4, 3, 2, '#a6d66a'); }), OUT); },
+  palm(r){ const hh = 16 + Math.floor(r() * 8); return outlined(mk(15, hh, h => { for (let y = 3; y < hh; y++) P(h, '#8a5a34', 7 + Math.round(Math.sin(y / 5) * 1.5), y, 2, 1); P(h, '#3f8a3e', 1, 1, 13, 2); P(h, '#3f8a3e', 0, 3, 4, 2); P(h, '#3f8a3e', 11, 3, 4, 2); P(h, '#2f6b34', 4, 0, 7, 1); P(h, '#6a3a1a', 7, 3, 2, 2); }), OUT); },
+  saguaro(r){ const hh = 16 + Math.floor(r() * 10); return outlined(mk(11, hh, h => { P(h, '#4a8a3e', 4, 0, 3, hh); P(h, '#6aaa52', 4, 0, 1, hh); const a = 5 + Math.floor(r() * 4); P(h, '#4a8a3e', 1, a, 2, 6); P(h, '#4a8a3e', 1, a + 5, 4, 2); P(h, '#4a8a3e', 8, a - 3, 2, 6); P(h, '#4a8a3e', 6, a + 2, 4, 2); }), OUT); },
+  joshua(r){ const hh = 12 + Math.floor(r() * 6); return outlined(mk(13, hh, h => { P(h, '#7a6248', 6, 4, 2, hh - 4); P(h, '#7a6248', 3, 5, 4, 1); P(h, '#7a6248', 3, 2, 1, 4); P(h, '#7a6248', 8, 6, 3, 1); P(h, '#7a6248', 10, 3, 1, 4);
+    for (const [x, y] of [[3, 1], [10, 2], [6, 3]]){ P(h, '#6a8a4a', x - 2, y - 1, 5, 2); P(h, '#8aaa5a', x - 1, y - 2, 3, 1); } }), OUT); },
+  shrub(r){ const w = 6 + Math.floor(r() * 5); return outlined(mk(w, 4, h => { P(h, '#8a9a6a', 0, 1, w, 3); P(h, '#a8b888', 1, 0, w - 2, 1); }), OUT); },
+  mesquite(r){ return outlined(mk(18, 11, h => { P(h, '#6a4a2a', 8, 4, 2, 7); P(h, '#6a4a2a', 5, 4, 3, 1); disc(h, 6, 3, 3, '#7a8a3a'); disc(h, 12, 3, 3, '#7a8a3a'); disc(h, 9, 2, 3, '#8a9a4a'); }), OUT); },
+  rock(r, col = '#9a8f84'){ const w = 5 + Math.floor(r() * 6); return outlined(mk(w, 4, h => { P(h, col, 0, 1, w, 3); P(h, shade(col, .25), 1, 0, w - 2, 1); P(h, shade(col, -.2), 0, 3, w, 1); }), OUT); },
+  redrock(r){ return PROP.rock(r, '#b8603a'); },
+  barn(r){ return outlined(mk(20, 16, h => { P(h, '#b8322f', 1, 6, 18, 10); P(h, '#d04a3a', 1, 6, 18, 1); P(h, '#5a2a22', 0, 4, 20, 3); P(h, '#5a2a22', 3, 1, 14, 3); P(h, '#7a3a2a', 6, 0, 8, 1);
+    P(h, '#f2efe6', 7, 9, 6, 7); P(h, '#b8322f', 8, 10, 4, 5); P(h, '#f2efe6', 8, 10, 1, 1); P(h, '#f2efe6', 11, 14, 1, 1); P(h, '#f2efe6', 9, 12, 2, 1); P(h, '#f2efe6', 9, 4, 2, 2); }), OUT); },
+  silo(r){ const hh = 18 + Math.floor(r() * 6); return outlined(mk(7, hh, h => { P(h, '#b9bdc6', 0, 3, 7, hh - 3); P(h, '#dfe2e8', 1, 3, 2, hh - 3); for (let y = 6; y < hh; y += 4) P(h, '#9aa0ab', 0, y, 7, 1); disc(h, 3, 3, 3, '#8a8f99'); P(h, '#b9bdc6', 2, 1, 2, 1); }), OUT); },
+  windmill(r){ return outlined(mk(15, 24, h => { for (let y = 8; y < 24; y++){ const s = Math.floor((y - 8) / 4); P(h, '#7a6a5a', 6 - s, y, 1, 1); P(h, '#7a6a5a', 8 + s, y, 1, 1); } P(h, '#7a6a5a', 6, 12, 3, 1); P(h, '#7a6a5a', 5, 17, 5, 1);
+    for (let i = 0; i < 8; i++){ const a = i * Math.PI / 4; for (let t = 1; t < 6; t++) P(h, '#d8d2c4', Math.round(7 + Math.cos(a) * t), Math.round(6 + Math.sin(a) * t), 1, 1); } P(h, '#b8322f', 7, 6, 1, 1); P(h, '#7a6a5a', 9, 5, 4, 2); }), OUT); },
+  hay(r){ return outlined(mk(7, 6, h => { disc(h, 3, 3, 3, '#d9b04a'); P(h, '#b88a2a', 1, 3, 5, 1); P(h, '#f2d07a', 2, 1, 2, 1); }), OUT); },
+  derrick(r){ return outlined(mk(11, 24, h => { for (let y = 2; y < 24; y++){ const s = Math.floor(y / 5); P(h, '#2a2a2e', 5 - s, y, 1, 1); P(h, '#2a2a2e', 5 + s, y, 1, 1); if (y % 5 === 0) P(h, '#2a2a2e', 5 - s, y, s * 2 + 1, 1); } P(h, '#2a2a2e', 4, 0, 3, 2); P(h, '#5a4a3a', 0, 22, 11, 2); }), OUT); },
+  pumpjack(r){ return outlined(mk(16, 10, h => { P(h, '#2a2a2e', 7, 3, 2, 6); P(h, '#3a3a40', 1, 2, 14, 2); P(h, '#3a3a40', 0, 1, 3, 4); P(h, '#5a4a3a', 0, 9, 16, 1); P(h, '#b8322f', 12, 6, 3, 3); }), OUT); },
+  factory(r){ const w = 24 + Math.floor(r() * 10); return outlined(mk(w, 26, h => { P(h, '#8a4a3a', 0, 12, w, 14); P(h, '#a85a44', 0, 12, w, 1); for (let x = 0; x < w; x += 6){ P(h, '#6a3a2e', x, 9, 6, 3); P(h, '#7a4a3a', x, 9, 3, 1); } for (let x = 2; x < w - 2; x += 4) P(h, '#ffd27a', x, 16, 2, 3);
+    P(h, '#5a4a44', 3, 0, 3, 12); P(h, '#5a4a44', w - 8, 2, 3, 10); P(h, '#b8322f', 3, 1, 3, 1); P(h, '#b8322f', w - 8, 3, 3, 1); }), OUT); },
+  tower(r, tall = 1){
+    const w = 9 + Math.floor(r() * 8), hh = Math.round((26 + r() * 30) * tall), C = ['#6a7894', '#8a8a96', '#7a6a5a', '#5a6a7a', '#9a8a7a'][Math.floor(r() * 5)];
+    return outlined(mk(w + 2, hh + 6, h => {
+      P(h, C, 1, 6, w, hh); P(h, shade(C, .2), 1, 6, 2, hh); P(h, shade(C, -.25), w - 1, 6, 2, hh);
+      const set = r() < .5; if (set){ P(h, C, 3, 2, w - 4, 5); P(h, shade(C, .2), 3, 2, 1, 5); }
+      if (r() < .5) P(h, '#5a5a66', (w >> 1) + 1, 0, 1, set ? 3 : 6);
+      for (let y = 9; y < hh + 3; y += 3) for (let x = 3; x < w; x += 3) P(h, r() < .25 ? '#ffe39a' : shade(C, -.35), x, y, 1, 2);
+    }), OUT); },
+  skyscraper(r){ return PROP.tower(r, 1.5); },
+  brick(r){ const w = 12 + Math.floor(r() * 6), hh = 12 + Math.floor(r() * 8); return outlined(mk(w, hh + 3, h => { P(h, '#a8523e', 0, 3, w, hh); P(h, '#c06a52', 0, 3, w, 1); P(h, '#5a3a2a', 0, 2, w, 2); P(h, '#7a4a3a', w - 4, 0, 2, 3);
+    for (let y = 6; y < hh; y += 4) for (let x = 2; x < w - 1; x += 3) P(h, '#f2e6c8', x, y, 1, 2); }), OUT); },
+  lighthouse(r){ return outlined(mk(9, 28, h => { for (let y = 8; y < 28; y++){ const w = 3 + Math.floor((y - 8) / 6); P(h, Math.floor((y - 8) / 4) % 2 ? '#b8322f' : '#f2efe6', 4 - (w >> 1), y, w, 1); } P(h, '#2a2a2e', 2, 6, 5, 2); P(h, '#ffe680', 3, 3, 3, 3); P(h, '#2a2a2e', 3, 1, 3, 2); P(h, '#2a2a2e', 1, 6, 7, 1); }), OUT); },
+  umbrella(r){ const C = ['#e24b3b', '#2f6fb0', '#e8b23a', '#3f8a3e'][Math.floor(r() * 4)]; return outlined(mk(13, 12, h => { P(h, '#6a4a2a', 6, 3, 1, 9); P(h, C, 1, 2, 11, 2); P(h, C, 3, 1, 7, 1); P(h, '#f2efe6', 4, 2, 2, 2); P(h, '#f2efe6', 8, 2, 2, 2); P(h, '#e8d5a8', 2, 11, 9, 1); }), OUT); },
+  liveoak(r){ return outlined(mk(26, 15, h => { P(h, '#4a3a2a', 12, 6, 3, 9); P(h, '#4a3a2a', 7, 7, 6, 1); P(h, '#4a3a2a', 15, 6, 5, 1);
+    for (const [x, y, rr] of [[6, 5, 4], [13, 3, 5], [20, 5, 4]]) disc(h, x, y, rr, '#3f5a32'); for (const [x, y] of [[8, 3], [14, 2], [19, 4]]) disc(h, x, y, 2, '#5a7a42');
+    for (let x = 3; x < 24; x += 3) P(h, '#9aa08a', x, 7 + (x % 2), 1, 3 + (x % 3)); }), OUT); },
+  longleaf(r){ const hh = 20 + Math.floor(r() * 8); return outlined(mk(9, hh, h => { P(h, '#6a4a2a', 4, 5, 1, hh - 5); disc(h, 4, 3, 3, '#3f6a3a'); P(h, '#5a8a4a', 2, 1, 3, 1); P(h, '#3f6a3a', 0, 4, 2, 1); P(h, '#3f6a3a', 7, 3, 2, 1); }), OUT); },
+  cypress(r){ return outlined(mk(22, 14, h => { P(h, '#5a4a3a', 9, 5, 2, 9); P(h, '#5a4a3a', 5, 6, 4, 1); P(h, '#5a4a3a', 11, 4, 5, 1); P(h, '#2f5a3a', 1, 2, 9, 3); P(h, '#2f5a3a', 9, 0, 12, 4); P(h, '#4a7a4a', 10, 0, 7, 1); P(h, '#4a7a4a', 2, 2, 5, 1); }), OUT); },
+  house(r){ const C = ['#e8d5a8', '#c9d6e6', '#e6c8b8', '#d8e6c8'][Math.floor(r() * 4)]; return outlined(mk(14, 12, h => { P(h, C, 1, 5, 12, 7); P(h, '#7a3a2a', 0, 3, 14, 3); P(h, '#7a3a2a', 3, 1, 8, 2); P(h, '#5a3a22', 6, 8, 2, 4); P(h, '#9fd3e8', 2, 7, 2, 2); P(h, '#9fd3e8', 10, 7, 2, 2); }), OUT); },
+  reeds(r){ return outlined(mk(7, 7, h => { for (let i = 0; i < 4; i++){ P(h, '#7a8a4a', 1 + i * 2, 2 + (i % 2), 1, 5); P(h, '#5a4a2a', 1 + i * 2, 1 + (i % 2), 1, 2); } }), OUT); },
+  sailboat(r){ return outlined(mk(12, 12, h => { P(h, '#7a4a2a', 1, 9, 10, 2); P(h, '#5a3a22', 2, 11, 8, 1); P(h, '#4a3a2a', 6, 1, 1, 8); P(h, '#f2efe6', 2, 2, 4, 6); P(h, '#f2efe6', 7, 3, 3, 5); }), OUT); },
 };
+
+// ---- the 19 backdrops ----
+const SKY = {
+  blue:   ['#7fc4ec','#96d0f0','#aedbf3','#c7e6f6','#ddf0f8'],
+  pale:   ['#8ab8e0','#9cc4e6','#b0d0ec','#c6dcf0','#dce8f4'],
+  grey:   ['#8a9aac','#9aa8b8','#aab6c4','#bcc6d0','#ced6de'],
+  winter: ['#8eaee6','#a2bdec','#b6cbf0','#cbdaf4','#e0e9f8'],
+  desert: ['#f0b97c','#f4c78f','#f8d6a6','#fbe3bd','#fdeed5'],
+  dusty:  ['#9ec4e0','#b4cfe2','#cad9e2','#dde2dc','#ede6d4'],
+  warm:   ['#86c0e8','#a0cdee','#bcdaf0','#d6e6f2','#f0eee2'],
+  haze:   ['#88a8d0','#9ab4d6','#aec2dc','#c2d0e2','#d6dee8'],
+};
+const BIOMES = {
+  rainforest: { n:'Rainforest',       map:'#4f7a52', sky:SKY.grey,   far:{ t:'volcano', c:['#8fa0b8','#7a8ca6'], cap:'#ffffff' }, mid:{ t:'hills', c:'#2f5a3a' }, line:[['fir',6],['pine',2]], gap:[0,3], ground:['#3f6e3a','#30582e'], rain:.55 },
+  baycliffs:  { n:'Bay Cliffs',       map:'#c9b46a', sky:SKY.pale,   far:{ t:'ranges', c:['#c9a868','#b8955a'] }, mid:{ t:'sea', c:'#3a86b8', cliffs:'#b89a6a' }, line:[['cypress',4],['shrub',2],['house',1]], gap:[14,40], ground:['#c9b070','#b29a5a'], rain:.15, fog:1 },
+  mojave:     { n:'Mojave Desert',    map:'#d8b480', sky:SKY.desert, far:{ t:'ranges', c:['#b88a6a','#a07858'] }, mid:{ t:'flat' }, line:[['joshua',4],['shrub',4],['rock',2]], gap:[10,36], ground:['#e2c28c','#cfab74'], rain:.03 },
+  saguaro:    { n:'Saguaro Desert',   map:'#e0a868', sky:SKY.desert, far:{ t:'ranges', c:['#a8809a','#94708a'] }, mid:{ t:'hills', c:'#d9a268', low:1 }, line:[['saguaro',5],['shrub',3],['redrock',1]], gap:[12,38], ground:['#e6b47a','#d09a60'], rain:.04 },
+  mesa:       { n:'Red Mesas',        map:'#c8704a', sky:SKY.warm,   far:{ t:'mesas', c:['#c0603a','#a44e30'] }, mid:{ t:'flat' }, line:[['shrub',4],['redrock',3],['joshua',1]], gap:[14,40], ground:['#d4825a','#bc6a44'], rain:.05 },
+  rockies:    { n:'Rocky Mountains',  map:'#8aa0b8', sky:SKY.winter, far:{ t:'peaks', c:['#9fb0d0','#8496bc'], cap:'#ffffff', big:1 }, mid:{ t:'hills', c:'#4f7a5a' }, line:[['snowpine',4],['pine',4],['rock',1]], gap:[0,6], ground:['#8ea88a','#768f74'], rain:.2, snow:.45 },
+  prairie:    { n:'Prairie',          map:'#d8c06a', sky:SKY.blue,   far:{ t:'none' }, mid:{ t:'hills', c:'#c9b45a', low:1 }, line:[['windmill',1],['hay',3],['round',1],['house',1]], gap:[22,60], ground:['#d6c070','#c0a858'], rain:.15 },
+  scrub:      { n:'Texas Scrub',      map:'#c8a870', sky:SKY.dusty,  far:{ t:'none' }, mid:{ t:'hills', c:'#c2a46a', low:1 }, line:[['mesquite',4],['derrick',2],['pumpjack',2],['shrub',3]], gap:[10,34], ground:['#cdb07a','#b8975e'], rain:.08 },
+  northwoods: { n:'Snowy North Woods',map:'#e8eef7', sky:SKY.winter, far:{ t:'none' }, mid:{ t:'lake', c:'#cfe0f2', frozen:1 }, line:[['snowpine',6],['birch',1]], gap:[0,4], ground:['#eef3fb','#d2dcec'], rain:.05, snow:.6 },
+  greatlakes: { n:'Great Lakes',      map:'#7aa86a', sky:SKY.pale,   far:{ t:'none' }, mid:{ t:'lake', c:'#4a8ac0', boats:1 }, line:[['birch',3],['pine',3],['round',1]], gap:[2,10], ground:['#6aa052','#558a44'], rain:.25 },
+  farmland:   { n:'Farmland',         map:'#9cc46a', sky:SKY.blue,   far:{ t:'none' }, mid:{ t:'hills', c:'#8cc062' }, line:[['barn',1],['silo',1],['round',3],['hay',2]], gap:[18,50], ground:['#86b85a','#9cc46a'], rain:.2, rows:1 },
+  steeltown:  { n:'Steel Town',       map:'#8a7a7a', sky:SKY.haze,   far:{ t:'bluehills', c:['#8a96a8','#7a869a','#6a7690'] }, mid:{ t:'hills', c:'#5a7a52' }, line:[['factory',3],['brick',3],['round',1]], gap:[2,10], ground:['#7a8a66','#66745a'], rain:.3, smog:1 },
+  skyline:    { n:'Skyscrapers',      map:'#9a9aa8', sky:SKY.haze,   far:{ t:'skyline', c:'#a8b4c8', tall:1 }, mid:{ t:'none' }, line:[['skyscraper',5],['tower',3],['brick',1]], gap:[0,3], ground:['#9a9ea8','#80848e'], rain:.25 },
+  harbor:     { n:'Harbor',           map:'#7aa0b8', sky:SKY.pale,   far:{ t:'none' }, mid:{ t:'sea', c:'#3a7aa8', boats:1 }, line:[['brick',4],['lighthouse',1],['house',2]], gap:[2,22], ground:['#8a9a7a','#748466'], rain:.35 },
+  hills:      { n:'Rolling Hills',    map:'#8ab06a', sky:SKY.blue,   far:{ t:'bluehills', c:['#8aa6cc','#7a96c0','#6a86b4'] }, mid:{ t:'hills', c:'#6aa04a' }, line:[['autumn',4],['round',2],['house',1]], gap:[0,8], ground:['#6aa04a','#5a8a3e'], rain:.3 },
+  pines:      { n:'Southern Pines',   map:'#6a9a5a', sky:SKY.warm,   far:{ t:'none' }, mid:{ t:'hills', c:'#5a8a4a', low:1 }, line:[['longleaf',6],['round',1]], gap:[1,7], ground:['#b8683a','#a05a32'], rain:.3 },
+  lowcountry: { n:'Lowcountry',       map:'#7a9a6a', sky:SKY.warm,   far:{ t:'none' }, mid:{ t:'marsh', c:'#5a8a8a' }, line:[['liveoak',3],['reeds',3],['palm',1]], gap:[4,22], ground:['#7a9a5a','#668548'], rain:.3 },
+  beach:      { n:'Beach',            map:'#ecd8a0', sky:SKY.blue,   far:{ t:'none' }, mid:{ t:'sea', c:'#2f8ac0', surf:1 }, line:[['palm',3],['umbrella',3]], gap:[10,34], ground:['#ecd49a','#d8bc80'], rain:.12 },
+  bigcity:    { n:'Big City',         map:'#9aa0a8', sky:SKY.warm,   far:{ t:'skyline', c:'#b0bccc' }, mid:{ t:'hills', c:'#5a9a4a', low:1 }, line:[['tower',4],['round',3],['brick',2]], gap:[0,6], ground:['#7aa05a','#668a4a'], rain:.25 },
+};
+
+// where along the real map you are decides what the land looks like between cities
+function regionBiome(lat, lon){
+  if (lon < -121) return lat > 42 ? 'rainforest' : 'baycliffs';
+  if (lon < -117.5) return lat > 35.5 ? 'rockies' : 'mojave';          // Cascades / Sierra Nevada
+  if (lon < -112.5) return lat > 41 ? 'mojave' : lat < 34.3 ? 'saguaro' : 'mojave';
+  if (lon < -104.8) return lat >= 38 ? 'rockies' : 'mesa';
+  if (lon < -97) return lat < 34.5 ? 'scrub' : lat > 44.5 ? 'northwoods' : 'prairie';
+  if (lon < -93) return lat > 44 ? 'northwoods' : lat < 34.5 ? 'pines' : 'prairie';
+  if (lon < -85) return lat > 41.5 ? 'greatlakes' : lat < 35 ? 'pines' : 'farmland';
+  if (lon < -80.5) return lat > 41.2 ? 'greatlakes' : lat > 38.5 ? 'farmland' : lat > 34.8 ? 'hills' : lat < 31.5 ? 'lowcountry' : 'pines';
+  if (lon < -76) return lat > 39.5 ? 'hills' : lat > 34 ? 'pines' : 'lowcountry';
+  return lat > 42 ? 'harbor' : 'hills';
+}
+// scenery at the train's spot on a trip: the city you left, the land in between, then the city ahead
+function sceneryAt(T){
+  const f = Math.min(1, (T.seg + T.el / segTime()) / T.segs);
+  if (f < .12) return TOWN[T.from].biome;
+  if (f > .88) return TOWN[T.to].biome;
+  const q = Math.round(f * 20) / 20, [a1, o1] = LATLON(T.from), [a2, o2] = LATLON(T.to);
+  return regionBiome(lerp(a1, a2, q), lerp(o1, o2, q));
+}
+
 const STRIP_W = 640;
-let strips = {};          // biome -> {far, hill, trees, near}
-function hash(n){ n = (n << 13) ^ n; return ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 0x7fffffff; }
+let strips = {};
+function hash(n){ n = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b); n ^= n >>> 13; n = Math.imul(n, 0xc2b2ae35); n ^= n >>> 16; return (n >>> 0) / 4294967296; }   // integer-safe, so big inputs stay random
 function makeStrips(biome, H, horizon){
-  const B = BIOMES[biome], r = mulberry(biome.length * 977 + biome.charCodeAt(0));
-  const far = mk(STRIP_W, H, g => {          // mountains / mesas
-    const n = 7;
-    for (let i = 0; i < n; i++){
-      const cx = i * STRIP_W / n + r() * 40, h = (biome === 'desert' ? 34 : 46) + r() * 26, w = 60 + r() * 50;
-      for (let dx = -w; dx <= w; dx++){
-        let top;
-        if (biome === 'desert'){ const e = Math.abs(dx) / w; top = horizon - h * (e < .6 ? .75 : (1 - e) / .4 * .75); }
-        else top = horizon - h * (1 - Math.abs(dx) / w) - (hash(i * 100 + dx) > .7 ? 1 : 0);
-        const col = dx < 0 ? B.far[0] : B.far[1];
-        for (const X of [cx + dx, cx + dx - STRIP_W, cx + dx + STRIP_W]){
-          const x = Math.round(X); if (x < 0 || x >= STRIP_W) continue;
-          P(g, col, x, Math.round(top), 1, horizon - Math.round(top));
-          if (B.cap && biome !== 'desert' && horizon - top > h * .62) P(g, dx < 0 ? B.cap : shade(B.cap, -.12), x, Math.round(top), 1, Math.max(2, Math.round((horizon - top) - h * .62)));
-          if (biome === 'desert'){ P(g, shade(col, -.12), x, Math.round(top) + 6, 1, 2); P(g, shade(col, -.12), x, Math.round(top) + 14, 1, 2); }
-        }
+  const B = BIOMES[biome], r = mulberry([...biome].reduce((s, c) => s * 31 + c.charCodeAt(0), 7));
+  const wrap = (g, img, x, y) => { g.drawImage(img, x, y); if (x + img.width > STRIP_W) g.drawImage(img, x - STRIP_W, y); };
+  // ---- far: mountains, mesas, distant skyline, blue ridges ----
+  const far = mk(STRIP_W, H, g => {
+    const F = B.far;
+    if (F.t === 'peaks' || F.t === 'volcano'){
+      const list = F.t === 'volcano' ? [[STRIP_W * .3, 74, 120], [STRIP_W * .72, 34, 60], [STRIP_W * .05, 30, 55], [STRIP_W * .9, 28, 50]]
+        : Array.from({ length:7 }, (_, i) => [i * STRIP_W / 7 + r() * 40, (F.big ? 58 : 40) + r() * (F.big ? 34 : 24), 55 + r() * 45]);
+      for (const [cx, h, w] of list) for (let dx = -w; dx <= w; dx++){
+        const top = Math.round(horizon - h * (1 - Math.abs(dx) / w) - (hash(Math.round(cx) + dx) > .75 ? 1 : 0)), col = dx < 0 ? F.c[0] : F.c[1];
+        for (const X of [cx + dx, cx + dx - STRIP_W, cx + dx + STRIP_W]){ const x = Math.round(X); if (x < 0 || x >= STRIP_W) continue;
+          P(g, col, x, top, 1, horizon - top);
+          if (F.cap && horizon - top > h * .55) P(g, dx < 0 ? F.cap : shade(F.cap, -.14), x, top, 1, Math.max(2, Math.round(horizon - top - h * .55) + (hash(x) > .6 ? 2 : 0))); }
       }
+    } else if (F.t === 'mesas'){
+      for (let i = 0; i < 5; i++){ const cx = i * STRIP_W / 5 + r() * 50, w = 30 + r() * 50, h = 22 + r() * 22;
+        for (let dx = -w; dx <= w; dx++){ const e = Math.abs(dx) / w, top = Math.round(horizon - h * (e < .7 ? 1 : (1 - e) / .3));
+          for (const X of [cx + dx, cx + dx - STRIP_W]){ const x = Math.round(X); if (x < 0 || x >= STRIP_W) continue;
+            P(g, dx < 0 ? F.c[0] : F.c[1], x, top, 1, horizon - top); P(g, shade(F.c[1], -.18), x, top + 5, 1, 2); P(g, shade(F.c[0], .15), x, top + 11, 1, 2); P(g, shade(F.c[1], -.1), x, top + 17, 1, 2); } } }
+    } else if (F.t === 'ranges'){
+      for (let x = 0; x < STRIP_W; x++){ const t = x / STRIP_W * Math.PI * 2, y = Math.round(horizon - 16 - 8 * Math.sin(t * 4 + 1) - 5 * Math.sin(t * 9 + 2) - 3 * Math.sin(t * 17));
+        P(g, (x % 80) < 40 ? F.c[0] : F.c[1], x, y, 1, horizon - y); P(g, shade(F.c[0], .15), x, y, 1, 1); }
+    } else if (F.t === 'bluehills'){
+      F.c.forEach((c, k) => { for (let x = 0; x < STRIP_W; x++){ const t = x / STRIP_W * Math.PI * 2, y = Math.round(horizon - 30 + k * 9 - 6 * Math.sin(t * (2 + k) + k) - 3 * Math.sin(t * (7 + k)));
+        P(g, c, x, y, 1, horizon - y); } });
+    } else if (F.t === 'skyline'){
+      let x = 0; while (x < STRIP_W){ const w = 8 + Math.floor(r() * 12), h = (F.tall ? 30 : 18) + Math.floor(r() * (F.tall ? 50 : 26));
+        P(g, F.c, x, horizon - h, w, h); P(g, shade(F.c, .12), x, horizon - h, 1, h); if (r() < .3) P(g, F.c, x + (w >> 1), horizon - h - 6, 1, 6); x += w + Math.floor(r() * 3); }
     }
   });
-  const hill = mk(STRIP_W, H, g => {         // rolling hills, or the sea
-    if (B.sea){
-      P(g, B.hill[1], 0, horizon - 14, STRIP_W, 14); P(g, B.hill[0], 0, horizon - 14, STRIP_W, 3);
-      for (let i = 0; i < 70; i++) P(g, '#cfe9f7', Math.floor(r() * STRIP_W), horizon - 13 + Math.floor(r() * 12), 2 + Math.floor(r() * 4), 1);
-      return;
-    }
-    for (let x = 0; x < STRIP_W; x++){
-      const t = x / STRIP_W * Math.PI * 2;
-      const y = horizon - 10 - 6 * Math.sin(t * 3 + 1) - 4 * Math.sin(t * 5 + 2) - 3 * Math.sin(t * 9);
-      P(g, B.hill[0], x, Math.round(y), 1, horizon - Math.round(y)); P(g, shade(B.hill[0], .18), x, Math.round(y), 1, 1);
-      if ((x + Math.round(y)) % 9 === 0) P(g, B.hill[1], x, Math.round(y) + 3, 2, 1);
+  // ---- mid: hills, sea, lakes, marsh ----
+  const hill = mk(STRIP_W, H, g => {
+    const M = B.mid;
+    if (M.t === 'hills'){
+      for (let x = 0; x < STRIP_W; x++){ const t = x / STRIP_W * Math.PI * 2, k = M.low ? .45 : 1;
+        const y = Math.round(horizon - (10 + 6 * Math.sin(t * 3 + 1) + 4 * Math.sin(t * 5 + 2) + 3 * Math.sin(t * 9)) * k);
+        P(g, M.c, x, y, 1, horizon - y); P(g, shade(M.c, .18), x, y, 1, 1); if ((x + y) % 9 === 0) P(g, shade(M.c, -.12), x, y + 3, 2, 1); }
+    } else if (M.t === 'sea' || M.t === 'lake' || M.t === 'marsh'){
+      const top = horizon - (M.t === 'sea' ? 16 : M.t === 'lake' ? 10 : 7);
+      P(g, M.c, 0, top, STRIP_W, horizon - top); P(g, shade(M.c, .2), 0, top, STRIP_W, 2);
+      for (let i = 0; i < (M.frozen ? 40 : 90); i++) P(g, M.frozen ? '#ffffff' : shade(M.c, .45), Math.floor(r() * STRIP_W), top + 2 + Math.floor(r() * (horizon - top - 3)), 2 + Math.floor(r() * 4), 1);
+      if (M.cliffs) for (let x = 0; x < STRIP_W; x++){ const t = x / STRIP_W * Math.PI * 2, h = Math.max(0, Math.round(12 * Math.sin(t * 3) + 6 * Math.sin(t * 7))); if (h > 0){ P(g, M.cliffs, x, horizon - h, 1, h); P(g, shade(M.cliffs, .2), x, horizon - h, 1, 1); } }
+      if (M.surf) for (let x = 0; x < STRIP_W; x += 1) if ((x * 7) % 23 < 12) P(g, '#ffffff', x, horizon - 2 - ((x >> 3) % 2), 1, 1);
+      if (M.boats) for (let i = 0; i < 3; i++){ const b = PROP.sailboat(r); wrap(g, b, Math.floor(r() * STRIP_W), top - b.height + 5); }
     }
   });
-  const trees = mk(STRIP_W, H, g => {        // tree line along the horizon
-    const C = B.treeC;
-    let x = 4;
-    while (x < STRIP_W - 10){
-      const s = .7 + r() * .6;
-      if (B.trees === 'round'){ const R0 = Math.round(6 * s); const t = outlined(mk(R0 * 2 + 3, R0 * 2 + 8, h => { P(h, '#6a4a2a', R0, R0 + 2, 2, 7); disc(h, R0 + 1, R0 + 1, R0, C[1]); disc(h, R0, R0, R0 - 1, C[0]); disc(h, R0 - 2, R0 - 2, Math.max(1, R0 - 4), C[2]); }), OUT);
-        g.drawImage(t, x, horizon - t.height + 2); x += t.width + Math.floor(r() * 14); }
-      else if (B.trees === 'pine' || B.trees === 'snowpine'){ const hh = Math.round(16 * s) + 6, w = Math.round(hh * .55);
-        const t = outlined(mk(w, hh, h => { P(h, '#5a3a22', (w >> 1) - 1, hh - 3, 2, 3); for (let y = 0; y < hh - 3; y++){ const ww = Math.max(1, Math.round((y % 6 + y / (hh - 3) * 6) / 12 * w)); P(h, C[0], (w >> 1) - (ww >> 1), y, ww, 1); P(h, C[1], (w >> 1), y, ww - (ww >> 1), 1); if (B.trees === 'snowpine' && y % 6 < 2) P(h, C[2], (w >> 1) - (ww >> 1), y, ww, 1); } }), OUT);
-        g.drawImage(t, x, horizon - t.height + 1); x += Math.floor(w * .7) + Math.floor(r() * 6); }
-      else if (B.trees === 'cactus'){ if (r() < .5){ const hh = Math.round(12 * s) + 4; const t = outlined(mk(9, hh, h => { P(h, C[0], 3, 0, 3, hh); P(h, C[2], 3, 0, 1, hh); P(h, C[0], 0, 4, 2, 4); P(h, C[0], 0, 7, 3, 1); P(h, C[0], 7, 2, 2, 4); P(h, C[0], 6, 5, 2, 1); }), OUT); g.drawImage(t, x, horizon - t.height + 1); }
-        else { const t = outlined(mk(8, 4, h => { P(h, '#b88a5a', 0, 1, 8, 3); P(h, '#d4a878', 1, 0, 5, 1); }), OUT); g.drawImage(t, x, horizon - 4); } x += 18 + Math.floor(r() * 30); }
-      else if (B.trees === 'palm'){ const hh = Math.round(14 * s) + 6; const t = outlined(mk(15, hh, h => { for (let y = 3; y < hh; y++) P(h, C[2], 7 + Math.round(Math.sin(y / 5) * 1.5), y, 2, 1); P(h, C[0], 1, 1, 13, 2); P(h, C[0], 0, 3, 4, 2); P(h, C[0], 11, 3, 4, 2); P(h, C[1], 4, 0, 7, 1); P(h, '#8a5a34', 7, 3, 2, 2); }), OUT); g.drawImage(t, x, horizon - t.height + 1); x += 22 + Math.floor(r() * 30); }
-      else if (B.trees === 'city'){ const w = 14 + Math.floor(r() * 18), hh = 14 + Math.floor(r() * 26); const t = outlined(mk(w, hh, h => { P(h, C[r() < .5 ? 0 : 1], 0, 0, w, hh); P(h, shade(C[0], .2), 0, 0, w, 1); for (let yy = 3; yy < hh - 2; yy += 5) for (let xx = 2; xx < w - 2; xx += 4) if (r() < .7) P(h, r() < .35 ? C[2] : shade(C[0], -.25), xx, yy, 2, 2); }), OUT); g.drawImage(t, x, horizon - t.height + 1); x += w + Math.floor(r() * 3); }
+  // ---- the line of props along the horizon ----
+  const trees = mk(STRIP_W, H, g => {
+    const tot = B.line.reduce((s, [, w]) => s + w, 0); let x = 2;
+    while (x < STRIP_W - 4){
+      let q = r() * tot, kind = B.line[0][0]; for (const [k, w] of B.line){ q -= w; if (q <= 0){ kind = k; break; } }
+      const img = PROP[kind](r);
+      wrap(g, img, x, horizon - img.height + 1);
+      x += Math.max(3, Math.floor(img.width * .8)) + B.gap[0] + Math.floor(r() * (B.gap[1] - B.gap[0] + 1));
     }
   });
   return { far, hill, trees };
@@ -895,7 +1002,7 @@ const cv = $('#scene'), ctx = cv.getContext('2d');
 let K = 1, BW = 320, BH = 180, buf = null, bx = null, horizon = 120, trackY = 140;
 let paused = false;
 const V = {                                        // visual state (not saved)
-  x:0, v:0, target:0, station:null, stationTown:null, decel:null, accel:0, smoke:[], snow:[], biome:'plains', prevBiome:null, fade:1, float:[], arriveAt:0,
+  x:0, v:0, target:0, station:null, stationTown:null, decel:null, accel:0, smoke:[], snow:[], biome:'prairie', prevBiome:null, fade:1, float:[], arriveAt:0,
   depart(){ this.accel = 2.2; this.decel = null; },
   arrive(town){ const rolling = !!this.decel; if (rolling){ const d = this.decel; this.x = d.x0 + d.v0 * d.cruise + d.v0 * d.D / 2; } this.decel = null; this.v = 0; this.stationTown = town; if (!rolling || this.station === null) this.placeStation(); setBiome(TOWN[town].biome); },
   placeStation(){ this.station = this.x + trainFront() - trainLen() / 2 - 75; },
@@ -924,7 +1031,21 @@ function resize(){
   if (G && V.stationTown) V.placeStation();
 }
 function getStrips(b){ return strips[b] || (strips[b] = makeStrips(b, BH, horizon)); }
-function setBiome(b){ if (b === V.biome) return; V.prevBiome = V.biome; V.biome = b; V.fade = 0; }
+function setBiome(b){ if (b === V.biome) return; V.prevBiome = V.biome; V.biome = b; V.fade = 0;
+  // the weather has to make sense for the new land: no rain over the desert, snow only where it's cold
+  const B = BIOMES[b], w = G && G.weather;
+  if (w && ((w.k === 'rain' || w.k === 'storm') && B.rain < .1 || w.k === 'snow' && !B.snow)) w.until = 0;
+}
+// weather lasts a few game hours, then rolls again for wherever the train is
+function weatherTick(force){
+  const now = G.day * 24, B = BIOMES[V.biome];
+  if (!G.weather) G.weather = { k:'clear', until:0 };
+  if (!force && G.weather.until > now) return;
+  const roll = Math.random();
+  const k = B.snow && roll < B.snow ? 'snow' : roll < B.rain ? (Math.random() < .2 ? 'storm' : 'rain') : 'clear';
+  G.weather = { k, until:now + 2 + Math.random() * 5 };
+}
+const weather = () => (G && G.weather ? G.weather.k : 'clear');
 
 // time of day: 0 = morning, .25 noon, .5 dusk, .75 night
 function lightAt(tod){
@@ -944,6 +1065,7 @@ function update(dt){
     const T = G.trip;
     T.el += dt;
     advanceDay(dt / SEC_PER_HOUR / 24);
+    weatherTick();
     // approach: the station appears off the right edge while we cruise, then we brake and stop right at the platform.
     // it is timed so the stop lands exactly when the trip clock runs out
     if (!V.decel){
@@ -958,8 +1080,7 @@ function update(dt){
         V.station = V.x + s + stopX; V.stationTown = T.to;
       }
     }
-    const legB = T.legs[Math.min(T.seg, T.legs.length - 1)];
-    setBiome(V.decel ? TOWN[T.to].biome : legB);
+    setBiome(V.decel ? TOWN[T.to].biome : sceneryAt(T));
     if (T.el >= segTime()) segmentDone();
   }
   // speed
@@ -987,10 +1108,19 @@ function update(dt){
   }
   for (const s of V.smoke){ s.life += dt; s.x += s.vx * dt; s.y += s.vy * dt; s.vy *= 1 - dt * .6; s.r = 1.5 + s.life * 3.2; }
   V.smoke = V.smoke.filter(s => s.life < s.max);
-  // snow
-  if (V.biome === 'snow' && V.snow.length < 70) V.snow.push({ x:Math.random() * BW, y:-2, vy:8 + Math.random() * 10, ph:Math.random() * 6 });
+  // snow, rain and lightning
+  const wk = weather(), snowing = wk === 'snow', raining = wk === 'rain' || wk === 'storm';
+  if (snowing && V.snow.length < 90) for (let i = 0; i < 2; i++) V.snow.push({ x:Math.random() * BW * 1.3, y:-2, vy:8 + Math.random() * 10, ph:Math.random() * 6 });
   for (const s of V.snow){ s.y += s.vy * dt; s.x += (Math.sin(s.ph + s.y / 12) * 6 - V.v * .4) * dt; if (s.x < 0) s.x += BW; }
-  V.snow = V.snow.filter(s => s.y < trackY + 10 && (V.biome === 'snow' || s.y > 0));
+  V.snow = V.snow.filter(s => s.y < trackY + 10);
+  const want = wk === 'storm' ? 260 : wk === 'rain' ? 140 : 0;
+  V.rain = V.rain || [];
+  for (let i = 0; i < 12 && V.rain.length < want; i++) V.rain.push({ x:Math.random() * (BW + 120), y:-Math.random() * 40, vy:190 + Math.random() * 70, len:3 + Math.random() * 3 });
+  for (const d of V.rain){ d.y += d.vy * dt; d.x -= (45 + V.v * .7) * dt; }
+  V.splash = (V.splash || []).filter(s => (s.t += dt) < .18);
+  V.rain = V.rain.filter(d => { if (d.y > trackY + 6){ if (Math.random() < .5) V.splash.push({ x:d.x, y:horizon + Math.random() * (trackY + 6 - horizon), t:0 }); return raining && V.rain.length <= want + 20 ? (d.y = -Math.random() * 30, d.x = Math.random() * (BW + 120), true) : false; } return true; });
+  V.flash = Math.max(0, (V.flash || 0) - dt * 4);
+  if (wk === 'storm' && Math.random() < dt / 5) V.flash = 1;
   for (const f of V.float){ f.t += dt; }
   V.float = V.float.filter(f => f.t < 1.6);
 }
@@ -1005,31 +1135,39 @@ function drawLayer(img, factor, alpha){
 function drawScene(){
   const tod = todNow();
   const [tint, ta, night] = lightAt(tod);
-  const B = BIOMES[V.biome], PB = V.prevBiome ? BIOMES[V.prevBiome] : B, f = V.fade;
+  const B = BIOMES[V.biome] || BIOMES.prairie, PB = BIOMES[V.prevBiome] || B, f = V.fade;
   // sky bands
   const bands = B.sky.length, top = 0, bh = Math.ceil(horizon / bands);
   for (let i = 0; i < bands; i++){ bx.fillStyle = f < 1 ? mix(PB.sky[i], B.sky[i], f) : B.sky[i]; bx.fillRect(0, top + i * bh, BW, bh + 1); }
   // stars + sun/moon
   if (night > .3){ bx.fillStyle = `rgba(255,255,240,${(night - .3) * 1.2})`; for (let i = 0; i < 40; i++){ const sx = (hash(i * 7) * BW * 1.3 - V.x * .02) % BW, sy = hash(i * 13) * horizon * .6; bx.fillRect((sx + BW) % BW | 0, sy | 0, 1, 1); } }
   const sunA = ((tod + .1) % 1) / .62;                       // sun arcs across between morning and dusk
-  if (sunA <= 1){ const sx = BW * (.1 + .8 * sunA), sy = horizon * (.7 - .55 * Math.sin(sunA * Math.PI)); disc(bx, sx | 0, sy | 0, 7, '#fff3c0'); disc(bx, sx | 0, sy | 0, 5, '#ffe680'); }
+  if (sunA <= 1 && !['rain','storm','snow'].includes(weather())){ const sx = BW * (.1 + .8 * sunA), sy = horizon * (.7 - .55 * Math.sin(sunA * Math.PI)); disc(bx, sx | 0, sy | 0, 7, '#fff3c0'); disc(bx, sx | 0, sy | 0, 5, '#ffe680'); }
   else { const mA = ((tod - .52 + 1) % 1) / .48; const mx = BW * (.1 + .8 * mA), my = horizon * (.7 - .5 * Math.sin(mA * Math.PI)); disc(bx, mx | 0, my | 0, 5, '#eef2ff'); disc(bx, (mx | 0) + 2, (my | 0) - 1, 4, mix(B.sky[0], '#1a2450', .5)); }
-  // clouds
-  for (let i = 0; i < 5; i++){ const cx = ((hash(i + 3) * BW * 2 - V.x * .04 - performance.now() / 1000 * 2) % (BW + 80) + BW + 80) % (BW + 80) - 40, cy = 14 + hash(i + 9) * horizon * .35;
-    bx.fillStyle = night > .5 ? '#8a94b8' : '#ffffff'; bx.fillRect(cx | 0, cy | 0, 26, 4); bx.fillRect((cx + 5) | 0, (cy - 3) | 0, 14, 4); bx.fillStyle = night > .5 ? '#6a7498' : '#e2eef8'; bx.fillRect((cx + 2) | 0, (cy + 3) | 0, 24, 2); }
+  // clouds: puffy, and heavy and grey when it's wet
+  const wk = weather(), wet = wk === 'rain' || wk === 'storm' || wk === 'snow';
+  if (wet){ bx.globalAlpha = wk === 'storm' ? .55 : .38; bx.fillStyle = wk === 'snow' ? '#c8d0dc' : '#6a7484'; bx.fillRect(0, 0, BW, horizon); bx.globalAlpha = 1; }
+  const nC = wet ? 9 : 5;
+  for (let i = 0; i < nC; i++){
+    const span = BW + 120, cx = ((hash(i + 3) * span * 2 - V.x * .04 - performance.now() / 1000 * 2) % span + span) % span - 60, cy = 12 + hash(i + 9) * horizon * (wet ? .3 : .38), sc = .8 + hash(i + 21) * .7;
+    const lit = night > .5 ? (wet ? '#5a6078' : '#8a94b8') : wet ? (wk === 'storm' ? '#7a808e' : '#a4acb8') : '#ffffff', dk = night > .5 ? '#4a5068' : wet ? (wk === 'storm' ? '#5e6470' : '#8a929e') : '#dde9f4';
+    disc(bx, cx | 0, (cy + 2) | 0, Math.round(5 * sc), dk); disc(bx, (cx + 9 * sc) | 0, (cy - 1) | 0, Math.round(7 * sc), dk); disc(bx, (cx + 20 * sc) | 0, (cy + 2) | 0, Math.round(5 * sc), dk);
+    disc(bx, cx | 0, cy | 0, Math.round(5 * sc) - 1, lit); disc(bx, (cx + 9 * sc) | 0, (cy - 3) | 0, Math.round(7 * sc) - 1, lit); disc(bx, (cx + 20 * sc) | 0, cy | 0, Math.round(5 * sc) - 1, lit);
+    bx.fillStyle = dk; bx.fillRect((cx - 4) | 0, (cy + 4) | 0, (28 * sc) | 0, 2);
+  }
   // parallax layers (cross-fade when the land changes)
   const S = getStrips(V.biome), PS = V.prevBiome && f < 1 ? getStrips(V.prevBiome) : null;
   if (PS){ drawLayer(PS.far, .08, 1 - f); drawLayer(PS.hill, .2, 1 - f); drawLayer(PS.trees, .42, 1 - f); }
-  drawLayer(S.far, .08, PS ? f : 1); drawLayer(S.hill, .2, PS ? f : 1); drawLayer(S.trees, .42, PS ? f : 1);
+  drawLayer(S.far, .08, PS ? f : 1);
+  if (B.fog || B.smog){ bx.globalAlpha = .35 * (PS ? f : 1); bx.fillStyle = B.smog ? '#b8aa9a' : '#f4f6f8'; bx.fillRect(0, horizon - 40, BW, 40); bx.globalAlpha = 1; }
+  drawLayer(S.hill, .2, PS ? f : 1); drawLayer(S.trees, .42, PS ? f : 1);
   // ground
-  const gc = f < 1 ? mix(PB.ground, B.ground, f) : B.ground, gd = f < 1 ? mix(PB.groundD, B.groundD, f) : B.groundD;
+  const gc = f < 1 ? mix(PB.ground[0], B.ground[0], f) : B.ground[0], gd = f < 1 ? mix(PB.ground[1], B.ground[1], f) : B.ground[1];
   bx.fillStyle = gc; bx.fillRect(0, horizon, BW, BH - horizon);
+  if (B.rows && f >= 1){ bx.fillStyle = gd; for (let y = horizon + 2; y < trackY - 3; y += 3) bx.fillRect(0, y, BW, 1); }
   bx.fillStyle = gd; for (let i = 0; i < 60; i++){ const gx = ((hash(i * 31) * 900 - V.x) % 900 + 900) % 900; if (gx < BW) bx.fillRect(gx | 0, horizon + 2 + (hash(i * 17) * (trackY - horizon - 4) | 0), 3, 1); }
   // telegraph poles + wires
-  const PG = 150, p0 = -((V.x) % PG);
-  bx.fillStyle = '#4a3a2a';
-  for (let x = p0 - PG; x < BW + PG; x += PG){ const X = Math.round(x); bx.fillRect(X, horizon - 30, 2, 30 + 6); bx.fillRect(X - 4, horizon - 28, 10, 2);
-    bx.fillStyle = '#3a3a3a'; for (let i = 0; i <= PG; i += 3){ const sag = Math.sin(i / PG * Math.PI) * 6; bx.fillRect(X + i, Math.round(horizon - 27 + sag), 1, 1); } bx.fillStyle = '#4a3a2a'; }
+  drawPoles();
   // stations (the one you just left can still be sliding away when the next one comes into view)
   if (V.oldStation != null){ const ox = Math.round(V.oldStation - V.x), osp = sprites.station[V.oldTown]; if (ox > -200) bx.drawImage(osp, ox, trackY - osp.height + 2); else V.oldStation = null; }
   if (V.station !== null){
@@ -1043,11 +1181,7 @@ function drawScene(){
     }
   }
   // track
-  bx.fillStyle = '#7d7064'; bx.fillRect(0, trackY + 1, BW, 6); bx.fillStyle = '#968a7c'; bx.fillRect(0, trackY + 1, BW, 1);
-  for (let i = 0; i < 40; i++){ const gx = ((hash(i * 53) * 400 - V.x) % 400 + 400) % 400; if (gx < BW) { bx.fillStyle = '#5e544a'; bx.fillRect(gx | 0, trackY + 3 + (i % 3), 2, 1); } }
-  const sl = -((V.x) % 8);
-  bx.fillStyle = '#5a3a24'; for (let x = sl - 8; x < BW; x += 8) bx.fillRect(Math.round(x), trackY + 1, 5, 3);
-  bx.fillStyle = '#4a4e58'; bx.fillRect(0, trackY - 1, BW, 2); bx.fillStyle = '#b9bdc6'; bx.fillRect(0, trackY - 1, BW, 1);
+  drawTrack();
   // train
   drawTrain(night);
   // smoke above train
@@ -1058,7 +1192,10 @@ function drawScene(){
   if (ta > 0){ bx.globalAlpha = ta; bx.fillStyle = tint; bx.fillRect(0, 0, BW, BH); bx.globalAlpha = 1; }
   if (night > .3) drawLights(night);
   // snow
-  if (V.biome === 'snow' || V.snow.length){ bx.fillStyle = '#ffffff'; for (const s of V.snow) bx.fillRect(s.x | 0, s.y | 0, 1, 1); }
+  if (V.snow.length){ bx.fillStyle = '#ffffff'; for (const s of V.snow) bx.fillRect(s.x | 0, s.y | 0, s.vy > 14 ? 2 : 1, s.vy > 14 ? 2 : 1); }
+  if (V.rain && V.rain.length){ bx.fillStyle = 'rgba(205,220,240,.75)'; for (const d of V.rain){ const x = d.x | 0, y = d.y | 0; for (let k = 0; k < d.len; k++) bx.fillRect(x + (k >> 1), y - k, 1, 1); }
+    bx.fillStyle = 'rgba(225,235,250,.8)'; for (const sp of V.splash){ const x = sp.x | 0, y = sp.y | 0, o = sp.t > .09 ? 1 : 0; bx.fillRect(x - 1 - o, y - o, 1, 1); bx.fillRect(x + 1 + o, y - o, 1, 1); } }
+  if (V.flash > 0){ bx.globalAlpha = V.flash * .55; bx.fillStyle = '#ffffff'; bx.fillRect(0, 0, BW, BH); bx.globalAlpha = 1; }
   // floating money
   bx.font = `bold 8px Silkscreen, monospace`; bx.textAlign = 'center';
   for (const fl of V.float){ bx.globalAlpha = 1 - fl.t / 1.6; bx.fillStyle = '#24150f'; bx.fillText(fl.txt, fl.x + 1, fl.y - fl.t * 14 + 1); bx.fillStyle = fl.col; bx.fillText(fl.txt, fl.x, fl.y - fl.t * 14); }
@@ -1066,6 +1203,64 @@ function drawScene(){
   // blit
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(buf, 0, 0, BW * K, BH * K);
+}
+// gravel bed, wooden ties with grain, rails with a shiny head, tie plates and spikes
+function drawTrack(){
+  const y = trackY;
+  // ballast: a mounded gravel bed
+  bx.fillStyle = '#867a6e'; bx.fillRect(0, y - 1, BW, 11);
+  bx.fillStyle = '#a2968a'; bx.fillRect(0, y - 1, BW, 1);
+  bx.fillStyle = '#766a5e'; bx.fillRect(0, y + 7, BW, 1);
+  bx.fillStyle = '#665c52'; bx.fillRect(0, y + 8, BW, 1);
+  bx.fillStyle = '#544a42'; bx.fillRect(0, y + 9, BW, 1);
+  const g0 = Math.floor(V.x);
+  for (let x = 0; x < BW; x++) for (let k = 0; k < 2; k++){ const h = hash(x * 3 + k * 7919 + g0 * 3); if (h > .45){ bx.fillStyle = h > .82 ? '#bcb0a2' : h > .64 ? '#5a5048' : '#968a7e'; bx.fillRect(x, y + 1 + Math.floor(hash(x + k * 31 + g0 + 999) * 9), 1, 1); } }
+  // ties: dark wood with a lit top edge, grain and an end-grain face
+  const TS = 9, t0 = -(V.x % TS);
+  for (let x = t0 - TS; x < BW; x += TS){
+    const X = Math.round(x), k = Math.floor((x + V.x) / TS), wood = ['#6b4a2e', '#644428', '#705034'][((k % 3) + 3) % 3];
+    bx.fillStyle = '#3a2618'; bx.fillRect(X - 1, y + 1, 8, 5);
+    bx.fillStyle = wood; bx.fillRect(X, y + 1, 6, 4);
+    bx.fillStyle = '#8a6440'; bx.fillRect(X, y + 1, 6, 1);
+    bx.fillStyle = '#4e3420'; bx.fillRect(X + 1 + (k & 1), y + 3, 3, 1); bx.fillRect(X, y + 4, 6, 1);
+    // tie plate + two spikes under the rail
+    bx.fillStyle = '#4a4a52'; bx.fillRect(X, y, 6, 1); bx.fillStyle = '#26262c'; bx.fillRect(X, y, 1, 1); bx.fillRect(X + 5, y, 1, 1);
+  }
+  // rail: shiny head, darker web, wide base
+  bx.fillStyle = '#2e3038'; bx.fillRect(0, y - 3, BW, 1);
+  bx.fillStyle = '#d6dae2'; bx.fillRect(0, y - 2, BW, 1);
+  bx.fillStyle = '#9aa0ab'; bx.fillRect(0, y - 1, BW, 1);
+  bx.fillStyle = '#5a5e68'; bx.fillRect(0, y, BW, 1);
+  bx.fillStyle = '#3a3d46'; bx.fillRect(0, y + 1, BW, 1);
+  // joint bars every rail length
+  const J = 72, j0 = -(V.x % J);
+  for (let x = j0 - J; x < BW; x += J){ const X = Math.round(x); bx.fillStyle = '#2e3038'; bx.fillRect(X, y - 2, 1, 2); bx.fillStyle = '#6a6e78'; bx.fillRect(X - 3, y - 1, 7, 2); bx.fillStyle = '#26262c'; bx.fillRect(X - 2, y, 1, 1); bx.fillRect(X + 2, y, 1, 1); }
+}
+// wooden telegraph poles: shaded pole, two crossarms with glass insulators, sagging wires
+function drawPoles(){
+  const PG = 160, p0 = -((V.x * .9) % PG), top = horizon - 34;
+  const wires = [[-6, 0], [6, 0]];
+  for (let x = p0 - PG; x < BW + PG; x += PG){
+    const X = Math.round(x);
+    // wires to the next pole
+    bx.fillStyle = 'rgba(44,38,34,.55)';
+    for (const [dx, dy] of wires){ let py = top - 2 + dy; for (let i = 0; i <= PG; i++){ const ny = Math.round(top - 2 + dy + Math.sin(i / PG * Math.PI) * 7); bx.fillRect(X + dx + i, Math.min(py, ny), 1, Math.abs(ny - py) + 1); py = ny; } }
+    // pole
+    bx.fillStyle = '#2a1c12'; bx.fillRect(X - 2, top - 2, 5, horizon - top + 9);
+    bx.fillStyle = '#6a4c34'; bx.fillRect(X - 1, top - 1, 3, horizon - top + 7);
+    bx.fillStyle = '#86644a'; bx.fillRect(X - 1, top - 1, 1, horizon - top + 7);
+    bx.fillStyle = '#4e3626'; bx.fillRect(X + 1, top - 1, 1, horizon - top + 7);
+    for (let yy = top + 10; yy < horizon + 4; yy += 7) { bx.fillStyle = '#4e3626'; bx.fillRect(X, yy, 1, 2); }
+    bx.fillStyle = '#3a3a40'; bx.fillRect(X - 2, top - 3, 5, 2);
+    // crossarms + insulators
+    for (const dy of [0, 6]){
+      bx.fillStyle = '#2a1c12'; bx.fillRect(X - 8, top + dy, 17, 3);
+      bx.fillStyle = '#7a5a40'; bx.fillRect(X - 7, top + dy + 1, 15, 1);
+      for (const dx of dy ? [-4, 4] : [-6, -4, 4, 6]){ bx.fillStyle = '#2a4a44'; bx.fillRect(X + dx - 1, top + dy - 2, 3, 2); bx.fillStyle = '#7fd0b8'; bx.fillRect(X + dx, top + dy - 2, 1, 1); }
+    }
+    // base: a little mound of dirt
+    bx.fillStyle = '#4e3a2a'; bx.fillRect(X - 3, horizon + 5, 7, 2);
+  }
 }
 function drawTrain(night){
   const front = trainFront(), base = trackY - 1, bob = V.v > 5 ? (Math.floor(V.x / 9) % 2) : 0;
@@ -1251,7 +1446,7 @@ const PANELS = {
       let go = '';
       if (G.town && isNeighbor(G.town, sel)){ const p = tripPreview(sel); go = `<div class="card hl"><div><b>${fmtMi(p.miles)}</b> at ${Math.round(p.mph)} mph · ${hoursText(p.hours)} on the clock</div><div class="small muted">About ${realText(p.secs)} of riding · coal ${fmt(p.coal)}${G.freeCoal ? ` (${fmtMi(G.freeCoal)} free)` : ''}</div><button class="btn go big" data-a="go:${sel}" style="margin-top:6px;width:100%">All aboard! → ${t.n}</button></div>`; }
       else if (G.town){ const r = route(G.town, sel).path; go = `<div class="card">No direct track from ${TOWN[G.town].n}. Stop in <b>${TOWN[r[1]].n}</b> first${r.length > 3 ? ` (shortest way: ${r.slice(1, -1).map(x => TOWN[x].n).join(' → ')})` : ''}.</div>`; }
-      info = `<h3 style="margin:0">${t.n}</h3><div class="small muted">${t.biome[0].toUpperCase() + t.biome.slice(1)} · ${['', 'small', 'medium', 'big'][t.size]} town${t.bank ? ' · bank' : ''}${t.shop ? ' · train yard' : ''}${t.shady ? ' · <span class="dn">lawless</span>' : ''}</div>
+      info = `<h3 style="margin:0">${t.n}</h3><div class="small muted">${BIOMES[t.biome].n} · ${['', 'small', 'medium', 'big'][t.size]} town${t.bank ? ' · bank' : ''}${t.shop ? ' · train yard' : ''}${t.shady ? ' · <span class="dn">lawless</span>' : ''}</div>
         <div style="margin:4px 0">Makes: ${t.prod.map(g => gImg(g)).join(' ')} &nbsp; Wants: ${wants}</div>${go}${pr}`;
     } else if (G.trip) info = `<div class="card">Heading to <b>${TOWN[G.trip.to].n}</b>. ${fmtMi(G.trip.miles * (1 - Math.min(1, (G.trip.seg + G.trip.el / segTime()) / G.trip.segs)))} to go.</div>`;
     return panelShell('Map', G.trip ? 'On the rails' : 'Pick a destination', `<div class="mapwrap"><div class="mapbox" id="mapbox"><canvas id="mapcv"></canvas></div><div class="mapinfo">${info}</div></div>`);
@@ -1386,7 +1581,7 @@ function drawMap(){
   for (const L of LAKES) poly(L, '#8fc0d8');
   for (let i = 0; i < 160; i++){ const x = hash(i * 3) * W | 0, y = hash(i * 5) * H | 0; if (g.getImageData(x, y, 1, 1).data[0] > 200) P(g, '#cbb57e', x, y, 2, 1); }
   // biome blobs
-  for (const t of TOWNS){ const col = { plains:'#a9c47a', forest:'#6f9a5a', snow:'#eef2f8', desert:'#e6b47a', coast:'#e8d6a0', city:'#b4b0b8' }[t.biome]; g.fillStyle = col; g.beginPath(); g.ellipse(X(t.id), Y(t.id), 10, 7, 0, 0, Math.PI * 2); g.fill(); }
+  for (const t of TOWNS){ const col = BIOMES[t.biome].map; g.fillStyle = col; g.beginPath(); g.ellipse(X(t.id), Y(t.id), 10, 7, 0, 0, Math.PI * 2); g.fill(); }
   // rails
   for (const [a, b] of EDGES){
     const x1 = X(a), y1 = Y(a), x2 = X(b), y2 = Y(b), n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
@@ -1470,7 +1665,7 @@ function boot(){
   } else newGame();
   resize(); buildSprites();
   if (G.town){ V.arrive(G.town); }
-  else { V.v = CRUISE; setBiome(G.trip.legs[Math.min(G.trip.seg, G.trip.legs.length - 1)]); V.fade = 1; }
+  else { V.v = CRUISE; setBiome(sceneryAt(G.trip)); V.fade = 1; }
   dispMoney = G.money;
   refreshHud();
   showNews(G.news[0].txt);
@@ -1481,7 +1676,7 @@ addEventListener('resize', () => { resize(); if (panelName === 'map') drawMap();
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else if (G){ const sec = Math.min(8 * 3600, Math.max(0, (Date.now() - G.wall) / 1000)); if (sec > 30){ const v = Math.round(incomePerHour() * sec / 3600); if (v > 0){ G.money += v; toast(`Your businesses earned ${fmt(v)} while you were away`, 'g'); } } G.wall = Date.now(); } });
 addEventListener('pagehide', save);
 // test hooks
-window.__pr = { get G(){ return G; }, V, pickMap:id => { tabs.map = id; renderPanel(); }, depart, openPanel, closePanel, segmentDone, roadEvent, refreshHud, newGame:() => { newGame(); buildSprites(); V.arrive(G.town); } };
+window.__pr = { get G(){ return G; }, V, sceneryAt, pickMap:id => { tabs.map = id; renderPanel(); }, depart, openPanel, closePanel, segmentDone, roadEvent, refreshHud, newGame:() => { newGame(); buildSprites(); V.arrive(G.town); } };
 boot();
 })();
 </script>
