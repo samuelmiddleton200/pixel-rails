@@ -328,7 +328,6 @@ const CARS = {
   coach:   { n:'Coach',        price:550,  seats:10, desc:'10 seats for regular passengers.' },
   luxury:  { n:'Luxury Car',   price:2200, rich:6,  desc:'6 plush seats. Rich passengers pay 3-4x.' },
   dining:  { n:'Dining Car',   price:1400,          desc:'All passenger fares +15%. Keeps crew fed (mood).' },
-  casino:  { n:'Casino Car',   price:2800,          desc:'Passengers gamble on the way: the house wins a little all trip long. A card dealer doubles it.' },
   tender:  { n:'Coal Tender',  price:900,  fuel:10,  desc:'Carries 10 more tons of engine coal for long runs.' },
   smug:    { n:'Hidden Hold',  price:1600, cap:4,   desc:'Secret compartment for 4 crates. Halves the chance inspectors find contraband.' },
 };
@@ -337,7 +336,7 @@ const ROLES = {
   conductor: { n:'Conductor',   desc:'Higher passenger fares' },
   guard:     { n:'Guard',       desc:'Fights bandits, distracts inspectors' },
   cook:      { n:'Cook',        desc:'Tips from passengers, happier crew' },
-  dealer:    { n:'Card Dealer', desc:'Casino car earns more' },
+  dealer:    { n:'Card Dealer', desc:'Talks passengers into better dice odds' },
 };
 const FIRST = ['Abe','Bess','Cal','Dot','Eli','Faye','Gus','Hattie','Ike','June','Kit','Lou','Mae','Ned','Opal','Pete','Rosa','Sam','Tess','Walt','Ada','Boone','Clem','Della','Ezra','Flo','Hank','Iris','Jeb','Lottie'];
 const LAST = ['Cobb','Hale','Pike','Rowe','Stone','Marsh','Fenn','Gray','Holt','Lane','Moss','Reed','Shaw','Tate','Vance','Wade','Boyd','Crane','Dunn','Frost'];
@@ -382,6 +381,7 @@ function save(){ if (!G) return; G.wall = Date.now(); try { localStorage.setItem
 function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && (g.v === 3 || g.v === 4)){
       if (g.fuel == null){ g.fuel = LOCOS[g.train.loco].tank; delete g.freeCoal; if (g.trip && g.trip.fuel == null) g.trip.fuel = 0; }
       if (g.v === 3){ g.v = 4; delete g.tod; if (g.trip){ const T = g.trip; T.path = [T.path[0], T.path[1]]; T.to = T.path[1]; T.miles = legMiles(T.from, T.to); T.hours = T.miles / LOCOS[g.train.loco].mph; T.secs = T.hours * SEC_PER_HOUR; T.seg = Math.min(T.seg, T.segs - 1); } }
+      if (g.train.cars.includes('casino')){ const n = g.train.cars.filter(c => c === 'casino').length; g.train.cars = g.train.cars.filter(c => c !== 'casino'); g.money += n * 1400; }
       g.train.cars.sort((a, b) => ['tender', 'luxury', 'coach', 'dining', 'casino', 'freight', 'smug'].indexOf(a) - ['tender', 'luxury', 'coach', 'dining', 'casino', 'freight', 'smug'].indexOf(b));
       return g; } } } catch (e) {} return null; }
 
@@ -549,11 +549,6 @@ function depart(to){
 function segmentDone(){
   const T = G.trip;
   G.train.cond = clamp(G.train.cond - rf(.7, 1.8), 0, 100);
-  // casino car: passengers gamble, the house wins
-  if (has('casino')){
-    const riders = paxUsed('std') + paxUsed('rich') * 3;
-    const w = Math.round(riders * (1.2 + .25 * skill('dealer')) * (skill('dealer') ? 2 : 1));
-    if (w){ G.money += w; T.log.push(['Casino winnings', w]); floatText('+' + fmt(w), '#ffd166'); }
   }
   if (skill('cook') && G.pax.length){ const tip = Math.round((paxUsed('std') + paxUsed('rich') * 2) * .6 * skill('cook')); if (tip){ G.money += tip; T.tips += tip; } }
   T.seg++; T.el = 0;
@@ -678,11 +673,6 @@ const ROAD = [
     ch:() => [
       { t:'Buy 4 tons of coal for $30', f:() => { const add = Math.min(4, fuelCap() - G.fuel); if (add <= 0) return 'Your tank is already full.'; G.money -= 30; G.fuel += add; return `Shoveled in ${add.toFixed(1)} t. Tank: ${G.fuel.toFixed(1)} t.`; } },
       { t:'No need', f:() => 'You wave him off.' },
-    ] },
-  { w:() => has('casino') ? 1 : 0, title:'Card sharp', text:() => 'A slick gambler in the casino car wants to play the house for high stakes.',
-    ch:() => [
-      { t:'Let him play ($150 pot)', f:() => { if (Math.random() < .45 + .06 * skill('dealer')){ G.money += 150; return `Your ${crew('dealer') ? 'dealer' : 'bartender'} cleans him out. +$150`; } G.money -= 150; return 'He walks away whistling with $150 of yours.'; } },
-      { t:'Throw him off the train', f:() => 'He lands in a haystack. Nice.' },
     ] },
 ];
 function race(bet){
@@ -1873,7 +1863,7 @@ function diceGame(who, rich){
   ];
   const offer = () => {
     const [txt, test, p] = pick(CONDS), stake = Math.max(5, Math.round(rf(8, 60) * rich / 5) * 5);
-    const fair = stake * (1 - p) / p, win = Math.max(5, Math.round(fair * rf(.6, 1.4) / 5) * 5);   // the passenger's offer can be good or bad
+    const fair = stake * (1 - p) / p, win = Math.max(5, Math.round(fair * (rf(.6, 1.4) + .05 * skill('dealer')) / 5) * 5);   // the passenger's offer can be good or bad
     return { txt, test, stake, win };
   };
   const face = v => `<span class="die">${v}</span>`;
