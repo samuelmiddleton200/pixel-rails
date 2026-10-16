@@ -172,6 +172,7 @@ table.mk img{width:22px;height:22px;vertical-align:middle}
 .mapbox .lbl[data-side=t]{transform:translate(-50%,calc(-100% - 7px))}
 .mapbox .lbl[data-side=l]{transform:translate(calc(-100% - 7px),-50%)}
 .mapbox .lbl[data-side=r]{transform:translate(7px,-50%)}
+.mapbox .lbl[data-side=br]{transform:translate(4px,5px)}
 .mapbox .lbl.here{background:#ffd166}
 .mapbox .lbl.sel{background:#8fd16a}
 .mapinfo{flex:1;overflow-y:auto;min-width:0}
@@ -261,10 +262,9 @@ const TOWNS = [
   { id:'fort', n:'Fort Worth',    x:46.9, y:41.5, biome:'desert', prod:['cattle','cotton'],  size:2, law:.25, roof:'#a8322e', lbl:'b' },
   { id:'minn', n:'Minneapolis',   x:53.8, y:11.2, biome:'snow',   prod:['grain','lumber'],   size:2, law:.25, roof:'#3f7fb8', lbl:'t' },
   { id:'detr', n:'Detroit',       x:71.1, y:17.8, biome:'forest', prod:['iron','lumber'],    size:2, law:.35, shop:1, roof:'#5a5a6a', lbl:'t' },
-  { id:'cinc', n:'Cincinnati',    x:68.6, y:25.8, biome:'plains', prod:['grain','iron'],     size:2, law:.3,  roof:'#6a8a3a', lbl:'b' },
-  { id:'pitt', n:'Pittsburgh',    x:76.3, y:22.5, biome:'forest', prod:['iron','coal'],      size:3, law:.4,  shop:1, roof:'#3a3a4a', lbl:'b' },
-  { id:'phil', n:'Philadelphia',  x:84.5, y:23.7, biome:'city',   prod:['luxury','grain'],   size:3, law:.55, bank:1, roof:'#8a3a2a', lbl:'r' },
-  { id:'nyc',  n:'New York',      x:86.4, y:21.8, biome:'city',   prod:['luxury','whiskey'], size:3, law:.7,  bank:1, shop:1, roof:'#6a4a8a', lbl:'t' },
+  { id:'cinc', n:'Cincinnati',    x:68.6, y:25.8, biome:'plains', prod:['grain','iron'],     size:2, law:.3,  roof:'#6a8a3a', lbl:'l' },
+  { id:'pitt', n:'Pittsburgh',    x:76.3, y:22.5, biome:'forest', prod:['iron','coal'],      size:3, law:.4,  shop:1, roof:'#3a3a4a', lbl:'br' },
+  { id:'nyc',  n:'New York',      x:86.4, y:21.8, biome:'city',   prod:['luxury','whiskey'], size:3, law:.7,  bank:1, shop:1, roof:'#6a4a8a', lbl:'r' },
   { id:'bost', n:'Boston',        x:91.4, y:17.7, biome:'coast',  prod:['lumber','cotton'],  size:3, law:.55, bank:1, roof:'#2f4a73', lbl:'t' },
   { id:'nash', n:'Nashville',     x:64.8, y:33.1, biome:'plains', prod:['whiskey','cattle'], size:2, law:.3,  roof:'#b5651d', lbl:'l' },
   { id:'char', n:'Charlotte',     x:74.8, y:35.4, biome:'forest', prod:['lumber','cotton'],  size:2, law:.3,  roof:'#4a7a3a', lbl:'r' },
@@ -274,10 +274,10 @@ const TOWNS = [
 ];
 const TOWN = Object.fromEntries(TOWNS.map(t => [t.id, t]));
 // every city links to the cities near it, and no two lines of track cross
-const EDGES = [['phil','nyc'],['jack','sava'],['nyc','bost'],['sava','atla'],['pitt','detr'],['atla','char'],['atla','nash'],['sava','char'],['nash','cinc'],
-  ['pitt','phil'],['cinc','pitt'],['cinc','detr'],['phoe','vega'],['jack','atla'],['phoe','albu'],['nash','char'],['cinc','char'],['denv','albu'],['vega','sanf'],
-  ['pitt','char'],['vega','albu'],['minn','kans'],['nash','kans'],['phil','char'],['kans','fort'],['fort','albu'],['cinc','kans'],['denv','kans'],['detr','minn'],
-  ['denv','vega'],['sanf','seat']];
+const EDGES = [['seat','denv'],['seat','minn'],['sanf','seat'],['jack','sava'],['nyc','bost'],['sava','atla'],['pitt','detr'],['atla','char'],['atla','nash'],
+  ['sava','char'],['nash','cinc'],['cinc','pitt'],['cinc','detr'],['phoe','vega'],['jack','atla'],['phoe','albu'],['pitt','nyc'],['nash','char'],['cinc','char'],
+  ['denv','albu'],['vega','sanf'],['pitt','char'],['vega','albu'],['minn','kans'],['nash','kans'],['nyc','detr'],['kans','fort'],['fort','albu'],['cinc','kans'],
+  ['denv','kans'],['nyc','char'],['detr','minn'],['denv','vega']];
 const ADJ = {}; TOWNS.forEach(t => ADJ[t.id] = []);
 const dist = (a, b) => Math.hypot(TOWN[a].x - TOWN[b].x, TOWN[a].y - TOWN[b].y);
 EDGES.forEach(([a, b]) => { const d = dist(a, b); ADJ[a].push([b, d]); ADJ[b].push([a, d]); });
@@ -326,13 +326,13 @@ const BIZ = {   // investment kinds; a town gets the ones that fit what it makes
 // =====================================================================================
 //  game state
 // =====================================================================================
-const SAVE_KEY = 'pixelrails.v2';
+const SAVE_KEY = 'pixelrails.v3';
 let G = null;
 
 function newGame(){
   const seed = Math.floor(Math.random() * 1e9);
   R = mulberry(seed);
-  G = { v:2, seed, money:600, day:1, tod:.1, town:START, trip:null, cargo:{}, paid:{}, pax:[], contracts:[],
+  G = { v:3, seed, money:600, day:1, tod:.1, town:START, trip:null, cargo:{}, paid:{}, pax:[], contracts:[],
     train:{ loco:0, cars:['freight','coach'], cond:100 }, crew:[], loan:0, shares:{}, events:[], news:[], mk:{}, offers:{},
     seen:{}, biz:{}, wageDays:0, freeCoal:0, wall:Date.now(), stats:{ trips:0, earned:0, best:0 }, cid:1, nextNewsDay:2 };
   // markets: every world rolls its own prices, so nobody knows the best route ahead of time
@@ -356,7 +356,7 @@ function newGame(){
 }
 
 function save(){ if (!G) return; G.wall = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) {} }
-function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && g.v === 2) return g; } } catch (e) {} return null; }
+function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && g.v === 3) return g; } } catch (e) {} return null; }
 
 // ---- prices ----
 function price(town, g){
@@ -519,7 +519,7 @@ function segmentDone(){
   T.seg++; T.el = 0;
   if (T.seg >= T.segs) return arrive();
   // random events on the road
-  if (Math.random() < .3 + (G.train.cond < 40 ? .1 : 0)) roadEvent();
+  if (!V.decel && Math.random() < .3 + (G.train.cond < 40 ? .1 : 0)) roadEvent();
   save(); rerender();
 }
 function arrive(){
@@ -875,7 +875,7 @@ let paused = false;
 const V = {                                        // visual state (not saved)
   x:0, v:0, target:0, station:null, stationTown:null, decel:null, accel:0, smoke:[], snow:[], biome:'plains', prevBiome:null, fade:1, float:[], arriveAt:0,
   depart(){ this.accel = 2.2; this.decel = null; },
-  arrive(town){ this.decel = null; this.v = 0; this.stationTown = town; this.placeStation(); setBiome(TOWN[town].biome); },
+  arrive(town){ const rolling = !!this.decel; if (rolling){ const d = this.decel; this.x = d.x0 + d.v0 * d.cruise + d.v0 * d.D / 2; } this.decel = null; this.v = 0; this.stationTown = town; if (!rolling || this.station === null) this.placeStation(); setBiome(TOWN[town].biome); },
   placeStation(){ this.station = this.x + trainFront() - trainLen() / 2 - 75; },
 };
 const CRUISE = 64;
@@ -921,17 +921,32 @@ function update(dt){
   if (G.trip && !paused){
     const T = G.trip;
     T.el += dt;
-    const BR = Math.min(2.6, segTime() * .85);
-    if (T.seg === T.segs - 1 && !V.decel && T.el >= segTime() - BR){       // start braking into the station
-      const D = BR, dist = V.v * D / 2;
-      V.station = V.x + dist + trainFront() - trainLen() / 2 - 75; V.stationTown = T.to; V.decel = { t:0, D, v0:V.v };
+    // approach: the station appears off the right edge while we cruise, then we brake and stop right at the platform.
+    // it is timed so the stop lands exactly when the trip clock runs out
+    if (!V.decel){
+      const left = (T.segs - T.seg - 1) * segTime() + (segTime() - T.el);
+      const v0 = Math.max(20, V.v), D = 2.6, stopX = trainFront() - trainLen() / 2 - 75, dist = BW + 12 - stopX;
+      const cruise = Math.max(0, (dist - v0 * D / 2) / v0);
+      if (left <= cruise + D){
+        V.decel = { t:0, D, v0, cruise:Math.max(0, left - D), x0:V.x };
+        // place the station so we stop at it wherever the clock says we are
+        const s = v0 * V.decel.cruise + v0 * D / 2;
+        if (V.station !== null){ V.oldStation = V.station; V.oldTown = V.stationTown; }
+        V.station = V.x + s + stopX; V.stationTown = T.to;
+      }
     }
     const legB = T.legs[Math.min(T.seg, T.legs.length - 1)];
     setBiome(V.decel ? TOWN[T.to].biome : legB);
     if (T.el >= segTime()) segmentDone();
   }
   // speed
-  if (V.decel){ V.decel.t += dt; V.v = Math.max(0, V.decel.v0 * (1 - V.decel.t / V.decel.D)); if (V.decel.t >= V.decel.D) V.v = 0; }
+  if (V.decel){
+    const d = V.decel; d.t += dt;
+    const tb = d.t - d.cruise;                                   // time since braking started
+    V.v = tb <= 0 ? d.v0 : Math.max(0, d.v0 * (1 - tb / d.D));
+    const s = tb <= 0 ? d.v0 * d.t : d.v0 * d.cruise + d.v0 * Math.min(tb, d.D) - d.v0 * Math.min(tb, d.D) ** 2 / (2 * d.D);
+    V.x = d.x0 + s - V.v * dt;                                   // the line below adds v*dt back
+  }
   else if (G.trip){
     const target = paused ? CRUISE * .35 : CRUISE * (.8 + .2 * loco().speed);
     V.v += (target - V.v) * Math.min(1, dt * (V.accel > 0 ? .9 : 1.5)); V.accel = Math.max(0, V.accel - dt);
@@ -992,7 +1007,8 @@ function drawScene(){
   bx.fillStyle = '#4a3a2a';
   for (let x = p0 - PG; x < BW + PG; x += PG){ const X = Math.round(x); bx.fillRect(X, horizon - 30, 2, 30 + 6); bx.fillRect(X - 4, horizon - 28, 10, 2);
     bx.fillStyle = '#3a3a3a'; for (let i = 0; i <= PG; i += 3){ const sag = Math.sin(i / PG * Math.PI) * 6; bx.fillRect(X + i, Math.round(horizon - 27 + sag), 1, 1); } bx.fillStyle = '#4a3a2a'; }
-  // station
+  // stations (the one you just left can still be sliding away when the next one comes into view)
+  if (V.oldStation != null){ const ox = Math.round(V.oldStation - V.x), osp = sprites.station[V.oldTown]; if (ox > -200) bx.drawImage(osp, ox, trackY - osp.height + 2); else V.oldStation = null; }
   if (V.station !== null){
     const sx = Math.round(V.station - V.x), sp = sprites.station[V.stationTown];
     if (sx > -200 && sx < BW + 50){
