@@ -1464,7 +1464,7 @@ const PANELS = {
       waiting = o.pax.length ? o.pax.map(p => {
         const free = p.cls === 'rich' ? rich - paxUsed('rich') : seats - paxUsed('std');
         const ok = free >= p.n;
-        return `<div class="card row"><span class="grow">${p.n} × ${p.cls === 'rich' ? '<b>Rich</b> <span class="tag e">LUXURY CAR</span>' : 'Regular'} to <b>${TOWN[p.to].n}</b><div class="small muted">${fmt(p.fare)} each · ${fmtMi(pathMiles(route(G.town, p.to).path))} away</div></span>
+        return `<div class="card row"><span class="grow">${p.n} × ${p.cls === 'rich' ? '<b>Rich</b> <span class="tag e">LUXURY CAR</span>' : 'Regular'} to <b>${TOWN[p.to].n}</b><div class="small muted">${fmt(p.fare)} each · ${awayText(p.to)}</div></span>
           <span class="num">${fmt(p.fare * p.n)}</span><button class="btn go" data-a="board:${p.id}" ${ok ? '' : 'disabled'}>${ok ? 'Board' : p.cls === 'rich' && !rich ? 'Need luxury car' : 'No seats'}</button></div>`;
       }).join('') : '<div class="muted">The platform is empty. More travelers show up each day.</div>';
     }
@@ -1474,12 +1474,12 @@ const PANELS = {
   con(){
     const act = G.contracts.length ? G.contracts.map(c => {
       const left = c.due - Math.floor(G.day), have = G.cargo[c.good] || 0;
-      return `<div class="card row">${gImg(c.good)}<span class="grow"><b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b><div class="small ${left <= 1 ? 'dn' : 'muted'}">Due day ${c.due} (${left <= 0 ? 'today!' : left + ' days left'}) · you have ${have}/${c.qty} · late fine ${fmt(c.fine)}</div></span><span class="num up">${fmt(c.pay)}</span></div>`;
+      return `<div class="card row">${gImg(c.good)}<span class="grow"><b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b> <span class="small muted">· ${awayText(c.to)}</span><div class="small ${left <= 1 ? 'dn' : 'muted'}">Due day ${c.due} (${left <= 0 ? 'today!' : left + ' days left'}) · you have ${have}/${c.qty} · late fine ${fmt(c.fine)}</div></span><span class="num up">${fmt(c.pay)}</span></div>`;
     }).join('') : '<div class="muted">No active contracts.</div>';
     let board = '';
     if (!G.trip){
       const o = G.offers[G.town];
-      board = o.con.map(c => `<div class="card row">${gImg(c.good)}<span class="grow">Deliver <b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b><div class="small muted">By day ${c.due} · fine if late ${fmt(c.fine)} · you buy the goods</div></span><span class="num up">${fmt(c.pay)}</span><button class="btn go" data-a="take:${c.id}" ${G.contracts.length >= 4 ? 'disabled' : ''}>Accept</button></div>`).join('') || '<div class="muted">No work posted today.</div>';
+      board = o.con.map(c => `<div class="card row">${gImg(c.good)}<span class="grow">Deliver <b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b> <span class="small muted">· ${awayText(c.to)}</span><div class="small muted">By day ${c.due} · fine if late ${fmt(c.fine)} · you buy the goods</div></span><span class="num up">${fmt(c.pay)}</span><button class="btn go" data-a="take:${c.id}" ${G.contracts.length >= 4 ? 'disabled' : ''}>Accept</button></div>`).join('') || '<div class="muted">No work posted today.</div>';
     }
     return panelShell('Contracts', `${G.contracts.length}/4 active`, (G.trip ? '' : `<h3 style="margin:2px 0 6px">Job board</h3>${board}`) + `<h3 style="margin:10px 0 6px">Your contracts</h3>${act}<div class="small muted">Contracts pay automatically when you arrive with the goods.</div>`);
   },
@@ -1559,6 +1559,14 @@ const PANELS = {
   },
 };
 let resetArm = false;
+// how far a town is from where you are (counting the rest of the current trip) and how many stops it takes
+function awayText(to){
+  let mi = 0, from = G.town, stops = 0;
+  if (G.trip){ const T = G.trip; mi = T.miles * (1 - Math.min(1, (T.seg + T.el / segTime()) / T.segs)); from = T.to; stops = 1; }
+  if (from === to) return `${fmtMi(mi)} away · this stop`;
+  const path = route(from, to).path; mi += pathMiles(path); stops += path.length - 1;
+  return `${fmtMi(mi)} away · ${stops} stop${stops === 1 ? '' : 's'}`;
+}
 function newsList(n){ return `<h3 style="margin:10px 0 6px">News</h3>` + G.news.slice(0, n).map(x => `<div class="card small"><b>Day ${x.day}:</b> ${esc(x.txt)}</div>`).join(''); }
 function cargoList(){ const k = Object.keys(G.cargo).filter(g => G.cargo[g] > 0); return `<h3 style="margin:8px 0 6px">Cargo ${cargoUsed()}/${capOf()}</h3>` + (k.length ? k.map(g => `<div class="card row">${gImg(g)}<span class="grow">${GOOD[g].n}</span><b>${G.cargo[g]}</b></div>`).join('') : '<div class="muted">Empty.</div>'); }
 
