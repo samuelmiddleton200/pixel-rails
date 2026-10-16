@@ -1731,10 +1731,15 @@ function drawRiders(type, x, y, carIdx){
 }
 // the ❗ bubble over a car
 function drawRequestBubble(x, y){
-  const bob = Math.round(Math.sin(performance.now() / 180) * 1.5), bx0 = Math.round(x + CAR_W / 2 - 6), by0 = y - 17 + bob;
-  P(bx, '#24150f', bx0, by0, 13, 14); P(bx, '#ffffff', bx0 + 1, by0 + 1, 11, 12); P(bx, '#ffe9a0', bx0 + 1, by0 + 10, 11, 3);
-  P(bx, '#24150f', bx0 + 5, by0 + 15, 3, 1); P(bx, '#24150f', bx0 + 6, by0 + 14, 1, 2);                // little tail
-  P(bx, '#e24b3b', bx0 + 5, by0 + 3, 3, 5); P(bx, '#e24b3b', bx0 + 5, by0 + 9, 3, 2);
+  // the bubble is a timer: the bar drains green -> yellow -> red, and it shakes when time is nearly up
+  const f = clamp(V.req.life / (V.req.max || 24), 0, 1), now = performance.now();
+  const shake = f < .25 ? Math.round(Math.sin(now / 40) * 1) : 0, bob = f < .25 ? 0 : Math.round(Math.sin(now / 180) * 1.5);
+  const bx0 = Math.round(x + CAR_W / 2 - 6) + shake, by0 = y - 19 + bob;
+  P(bx, '#24150f', bx0, by0, 13, 16); P(bx, '#ffffff', bx0 + 1, by0 + 1, 11, 14);
+  P(bx, '#24150f', bx0 + 5, by0 + 16, 3, 1); P(bx, '#24150f', bx0 + 6, by0 + 16, 1, 2);                // little tail
+  P(bx, '#e24b3b', bx0 + 5, by0 + 2, 3, 6); P(bx, '#e24b3b', bx0 + 5, by0 + 9, 3, 2);                 // !
+  const col = f > .5 ? '#3f8a3e' : f > .25 ? '#e8b23a' : (Math.floor(now / 150) % 2 ? '#e24b3b' : '#ff8a6a');
+  P(bx, '#cfc4b0', bx0 + 1, by0 + 12, 11, 3); P(bx, col, bx0 + 1, by0 + 12, Math.max(1, Math.round(11 * f)), 3); P(bx, '#24150f', bx0 + 1, by0 + 11, 11, 1);
   V.req.hit = [bx0 - 8, by0 - 8, 29, 30];
 }
 // who might want something: a car with people in it
@@ -1747,7 +1752,7 @@ function requestTick(dt){
   if (V.reqT > 0) return;
   V.reqT = 16 + Math.random() * 22;
   const car = pick(cars);
-  V.req = { car, rich:G.train.cars[car] === 'luxury', life:24 };
+  V.req = { car, rich:G.train.cars[car] === 'luxury', life:24, max:24 };
   if (!G.hintReq){ G.hintReq = 1; toast('A passenger wants something. Tap the ❗', 'g'); }
 }
 cv.addEventListener('pointerdown', e => {
