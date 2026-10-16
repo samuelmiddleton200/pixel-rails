@@ -188,6 +188,10 @@ table.mk img{width:22px;height:22px;vertical-align:middle}
 .mb .ch .btn{text-align:left;font-size:15px;padding:6px 10px;white-space:normal}
 .lines div{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dashed var(--paper-dd)}
 
+.hand{margin-top:2px}
+.pc{display:inline-block;min-width:34px;padding:5px 4px;margin-right:4px;border:2px solid var(--ink);border-radius:6px;background:#fff;font:700 16px var(--px);text-align:center;box-shadow:0 2px 0 rgba(0,0,0,.25)}
+.pc.red{color:#b8322f}.pc.back{background:repeating-linear-gradient(45deg,#2f4a73 0 4px,#3f5a83 4px 8px);color:transparent}
+.die{display:inline-grid;place-items:center;width:52px;height:52px;border:3px solid var(--ink);border-radius:10px;background:#fff;font:700 26px var(--px);box-shadow:0 3px 0 rgba(0,0,0,.3)}
 #toasts{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 72px);display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none}
 .toast{background:var(--paper);border:2px solid var(--ink);border-radius:7px;padding:3px 10px;font-weight:700;font-size:14px;animation:tin .25s ease-out}
 .toast.g{background:#c9efb0}.toast.r{background:#ffc2ad}
@@ -203,6 +207,7 @@ table.mk img{width:22px;height:22px;vertical-align:middle}
   <div id="hud">
     <div class="chip" id="moneyChip"><img class="px" id="coinImg" alt=""><span id="money">$0</span></div>
     <div class="chip" id="where"></div>
+    <div class="chip" id="fuelChip"></div>
     <div class="chip" id="dayChip"></div>
   </div>
   <div id="news"></div>
@@ -305,10 +310,10 @@ const fmtMi = m => Math.round(m).toLocaleString('en-US') + ' mi';
 const segsFor = d => Math.max(2, Math.round(d / SEG_LEN));
 
 const LOCOS = [
-  { n:'Little Rusty',    mph:30, speed:1.0,  cars:3, coal:1.0, price:0,     col:'#2b2d3a', trim:'#b8322f' },
-  { n:'Prairie Runner',  mph:45, speed:1.5, cars:4, coal:1.2, price:1800,  col:'#2d4a3a', trim:'#d6a83c' },
-  { n:'Iron Duke',       mph:60, speed:2.0,  cars:6, coal:1.5, price:6000,  col:'#3a2d4a', trim:'#d6a83c' },
-  { n:'Silver Comet',    mph:85, speed:2.83, cars:8, coal:1.8, price:18000, col:'#5a6478', trim:'#e8eef7' },
+  { n:'Little Rusty',    mph:30, tank:12, speed:1.0,  cars:3, coal:1.0, price:0,     col:'#2b2d3a', trim:'#b8322f' },
+  { n:'Prairie Runner',  mph:45, tank:14, speed:1.5, cars:4, coal:1.2, price:1800,  col:'#2d4a3a', trim:'#d6a83c' },
+  { n:'Iron Duke',       mph:60, tank:18, speed:2.0,  cars:6, coal:1.5, price:6000,  col:'#3a2d4a', trim:'#d6a83c' },
+  { n:'Silver Comet',    mph:85, tank:24, speed:2.83, cars:8, coal:1.8, price:18000, col:'#5a6478', trim:'#e8eef7' },
 ];
 const CARS = {
   freight: { n:'Freight Car',  price:450,  cap:10,  desc:'Holds 10 crates of cargo.' },
@@ -316,6 +321,7 @@ const CARS = {
   luxury:  { n:'Luxury Car',   price:2200, rich:6,  desc:'6 plush seats. Rich passengers pay 3-4x.' },
   dining:  { n:'Dining Car',   price:1400,          desc:'All passenger fares +15%. Keeps crew fed (mood).' },
   casino:  { n:'Casino Car',   price:2800,          desc:'Passengers gamble on the way: the house wins a little all trip long. A card dealer doubles it.' },
+  tender:  { n:'Coal Tender',  price:900,  fuel:10,  desc:'Carries 10 more tons of engine coal for long runs.' },
   smug:    { n:'Hidden Hold',  price:1600, cap:4,   desc:'Secret compartment for 4 crates. Halves the chance inspectors find contraband.' },
 };
 const ROLES = {
@@ -343,7 +349,7 @@ function newGame(){
   R = mulberry(seed);
   G = { v:4, seed, money:600, day:1 + 8 / 24, weather:{ k:'clear', until:0 }, town:START, trip:null, cargo:{}, paid:{}, pax:[], contracts:[],
     train:{ loco:0, cars:['freight','coach'], cond:100 }, crew:[], loan:0, shares:{}, events:[], news:[], mk:{}, offers:{},
-    seen:{}, biz:{}, wageDays:0, freeCoal:0, wall:Date.now(), stats:{ trips:0, earned:0, best:0 }, cid:1, nextNewsDay:2 };
+    seen:{}, biz:{}, wageDays:0, fuel:12, wall:Date.now(), stats:{ trips:0, earned:0, best:0 }, cid:1, nextNewsDay:2 };
   // markets: every world rolls its own prices, so nobody knows the best route ahead of time
   for (const t of TOWNS){
     const m = {}; G.mk[t.id] = m;
@@ -366,6 +372,7 @@ function newGame(){
 
 function save(){ if (!G) return; G.wall = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) {} }
 function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && (g.v === 3 || g.v === 4)){
+      if (g.fuel == null){ g.fuel = LOCOS[g.train.loco].tank; delete g.freeCoal; if (g.trip && g.trip.fuel == null) g.trip.fuel = 0; }
       if (g.v === 3){ g.v = 4; delete g.tod; if (g.trip){ const T = g.trip; T.path = [T.path[0], T.path[1]]; T.to = T.path[1]; T.miles = legMiles(T.from, T.to); T.hours = T.miles / LOCOS[g.train.loco].mph; T.secs = T.hours * SEC_PER_HOUR; T.seg = Math.min(T.seg, T.segs - 1); } }
       return g; } } } catch (e) {} return null; }
 
@@ -402,7 +409,9 @@ const hourOfDay = () => (G.day % 1) * 24;
 const todNow = () => ((hourOfDay() - 6) / 24 + 1) % 1;                   // 0 = 6 AM, .25 noon, .5 6 PM, .75 midnight
 function clockText(){ const mins = Math.floor(hourOfDay() * 60 + 1e-3), H = Math.floor(mins / 60) % 24, m = Math.floor(mins % 60 / 10) * 10; return `${(H + 11) % 12 + 1}:${String(m).padStart(2, '0')} ${H < 12 ? 'AM' : 'PM'}`; }
 const isNeighbor = (a, b) => ADJ[a].some(([t]) => t === b);
-const coalPer100 = () => loco().coal * 5.5 * (1 - .06 * skill('engineer'));     // dollars of coal per 100 miles
+const burnPer100 = () => loco().coal * (1 - .06 * skill('engineer'));                 // tons of engine coal per 100 miles
+const fuelCap = () => loco().tank + G.train.cars.filter(c => c === 'tender').length * CARS.tender.fuel;
+const fuelPrice = t => buyP(t, 'coal');                                                // engine coal costs what coal costs in that town
 function netWorth(){
   let v = G.money - G.loan;
   for (const t in G.biz) for (const b of G.biz[t]) v += b.owned * b.price * .7;
@@ -504,14 +513,15 @@ function accrue(sec){
 function tripPreview(to){
   const path = [G.town, to], miles = legMiles(G.town, to), mph = mphNow(), hours = miles / mph;
   const segs = Math.max(2, Math.round(hours / 4));                          // a chance of a road event about every 4 hours
-  return { path, segs, miles, mph, hours, secs:hours * SEC_PER_HOUR, coal:Math.round(coalPer100() * Math.max(0, miles - G.freeCoal) / 100) };
+  return { path, segs, miles, mph, hours, secs:hours * SEC_PER_HOUR, fuel:Math.round(miles / 100 * burnPer100() * 10) / 10 };
 }
 const hoursText = h => h < 1 ? Math.round(h * 60) + ' min' : (Math.round(h * 2) / 2) + ' hr';
 const realText = s => s < 60 ? Math.round(s) + 's' : Math.floor(s / 60) + 'm ' + String(Math.round(s % 60)).padStart(2, '0') + 's';
 function depart(to){
   if (!isNeighbor(G.town, to)){ toast('No direct track. Go to a connecting city first.', 'r'); return; }
   const p = tripPreview(to);
-  if (G.money < p.coal){ toast('Not enough money for coal!', 'r'); return; }
+  if (p.fuel > fuelCap()){ toast(`Too far for your tank (needs ${p.fuel.toFixed(1)} t). Add a coal tender or a bigger engine.`, 'r'); return; }
+  if (G.fuel + 1e-6 < p.fuel){ toast(`Not enough coal: need ${p.fuel.toFixed(1)} t, you have ${G.fuel.toFixed(1)} t.`, 'r'); return; }
   closePanel();
   // biome for each segment: first half looks like where you left, second half like where you are going
   const legs = [];
@@ -519,16 +529,14 @@ function depart(to){
     const f = (i + .5) / p.segs * (p.path.length - 1), k = Math.min(p.path.length - 2, Math.floor(f));
     legs.push(TOWN[f - k < .5 ? p.path[k] : p.path[k + 1]].biome);
   }
-  G.trip = { from:G.town, to, path:p.path, segs:p.segs, miles:p.miles, secs:p.secs, hours:p.hours, seg:0, el:0, legs, log:[], tips:0, sick:false };
+  G.trip = { from:G.town, to, path:p.path, segs:p.segs, miles:p.miles, secs:p.secs, hours:p.hours, fuel:p.fuel, board:[], boardT:0, reserved:null, seg:0, el:0, legs, log:[], tips:0, sick:false };
+  for (let i = 0; i < 3; i++) G.trip.board.push(makeGroup(to));
   G.town = null; G.stats.trips++;
   V.depart();
   save(); refreshHud();
 }
 function segmentDone(){
   const T = G.trip;
-  const segMi = T.miles / T.segs, free = Math.min(G.freeCoal, segMi);   // free coal from the merchant burns first
-  G.freeCoal -= free;
-  const c = Math.round(coalPer100() * (segMi - free) / 100); G.money -= c; T.coal = (T.coal || 0) + c;
   G.train.cond = clamp(G.train.cond - rf(.7, 1.8), 0, 100);
   // casino car: passengers gamble, the house wins
   if (has('casino')){
@@ -546,13 +554,18 @@ function segmentDone(){
 function arrive(){
   const T = G.trip, to = T.to, t = TOWN[to], lines = [];
   lines.push([`${fmtMi(T.miles)} in ${hoursText(T.hours || T.secs / SEC_PER_HOUR)}`, 0]);
-  if (T.coal) lines.push([`Coal`, -T.coal]);
+  if (T.burned) lines.push([`Burned ${T.burned.toFixed(1)} t of coal (${G.fuel.toFixed(1)} t left)`, 0]);
   lines.push(...T.log);
   G.trip = null; G.town = to;
   // fares
   let fares = 0;
   const mult = (1 + .06 * skill('conductor')) * (has('dining') ? 1.15 : 1) * (T.sick ? .8 : 1);
   for (const p of G.pax.slice()) if (p.to === to){ fares += Math.round(p.fare * p.n * mult); G.pax.splice(G.pax.indexOf(p), 1); }
+  // the group you reserved is waiting on the platform
+  if (T.reserved){ const r = T.reserved; delete r.life; delete r.max;
+    const free = r.cls === 'rich' ? richOf() - paxUsed('rich') : seatsOf() - paxUsed('std');
+    if (free >= r.n){ G.pax.push(r); lines.push([`Your reservation boarded: ${r.n} to ${TOWN[r.to].n}`, 0]); }
+    else { G.offers[to].pax.unshift(r); lines.push([`Your reserved group is waiting (no seats)`, 0]); } }
   if (fares) lines.push(['Passenger fares', fares]);
   if (T.tips) lines.push(['Tips (cook)', 0, T.tips]);
   // contracts
@@ -652,7 +665,7 @@ const ROAD = [
     ] },
   { w:() => 1, title:'Coal merchant', text:() => 'A coal merchant at a siding offers a cheap deal.',
     ch:() => [
-      { t:'Buy 600 miles of coal for $25', f:() => { G.money -= 25; G.freeCoal += 600; return 'The tender is stuffed. Your next 600 miles burn free coal.'; } },
+      { t:'Buy 4 tons of coal for $30', f:() => { const add = Math.min(4, fuelCap() - G.fuel); if (add <= 0) return 'Your tank is already full.'; G.money -= 30; G.fuel += add; return `Shoveled in ${add.toFixed(1)} t. Tank: ${G.fuel.toFixed(1)} t.`; } },
       { t:'No need', f:() => 'You wave him off.' },
     ] },
   { w:() => has('casino') ? 1 : 0, title:'Card sharp', text:() => 'A slick gambler in the casino car wants to play the house for high stakes.',
@@ -733,8 +746,9 @@ const CAR_W = 60, CAR_H = 30;
 function carSprite(type, night){
   return outlined(mk(CAR_W, CAR_H, g => {
     const win = night ? '#ffd86b' : '#cfe8f5', winHi = night ? '#fff2b8' : '#eef8fd';
-    if (type === 'freight' || type === 'smug'){
-      const b = type === 'smug' ? '#5e4a3a' : '#8a5a34';
+    if (type === 'freight' || type === 'smug' || type === 'tender'){
+      const b = type === 'smug' ? '#5e4a3a' : type === 'tender' ? '#3a3d46' : '#8a5a34';
+      if (type === 'tender') for (let x = 3; x < 57; x += 3){ const h = 3 + ((x * 7) % 3); P(g, '#1e1e24', x, 12 - h, 4, h + 1); P(g, '#5c5c66', x + 1, 12 - h, 1, 1); }
       P(g, b, 1, 12, 58, 14); P(g, shade(b, .25), 1, 12, 58, 2); P(g, shade(b, -.3), 1, 24, 58, 2);
       for (let x = 6; x < 58; x += 7) P(g, shade(b, -.2), x, 14, 1, 10);
       P(g, '#3a2a1f', 0, 26, 60, 2);
@@ -745,9 +759,9 @@ function carSprite(type, night){
       P(g, b, 1, 6, 58, 21); P(g, shade(b, .22), 1, 6, 58, 2); P(g, shade(b, -.3), 1, 24, 58, 3);
       P(g, roof, 0, 2, 60, 5); P(g, shade(roof, .35), 2, 2, 56, 1); P(g, roof, 2, 1, 56, 1);
       P(g, tr, 1, 20, 58, 1);
-      if (type === 'luxury'){ P(g, tr, 1, 8, 58, 1); for (let i = 0; i < 4; i++){ const x = 6 + i * 13; P(g, '#1c2850', x - 1, 10, 11, 9); P(g, win, x, 11, 9, 7); P(g, winHi, x, 11, 3, 2); P(g, '#b8322f', x, 11, 2, 7); P(g, '#b8322f', x + 7, 11, 2, 7); } }
+      if (type === 'luxury'){ P(g, tr, 1, 7, 58, 1); for (let i = 0; i < 4; i++){ const x = 5 + i * 13; P(g, '#1c2850', x - 1, 8, 11, 12); P(g, win, x, 9, 9, 10); P(g, winHi, x, 9, 3, 2); P(g, '#b8322f', x, 9, 1, 10); P(g, '#b8322f', x + 8, 9, 1, 10); P(g, '#e8c35a', x, 9, 9, 1); } }
       else if (type === 'casino'){ for (let i = 0; i < 3; i++){ const x = 8 + i * 17; P(g, roof, x - 1, 10, 10, 8); P(g, win, x, 11, 8, 6); P(g, winHi, x, 11, 3, 2); } for (let x = 4; x < 58; x += 6){ P(g, tr, x, 22, 2, 1); } P(g, tr, 26, 3, 8, 3); }
-      else { for (let i = 0; i < 5; i++){ const x = 5 + i * 10.5 | 0; P(g, roof, x - 1, 10, 8, 8); P(g, win, x, 11, 6, 6); P(g, winHi, x, 11, 2, 2); } if (type === 'dining') for (let i = 0; i < 5; i++) P(g, '#ffd166', 7 + (i * 10.5 | 0), 15, 2, 2); }
+      else { for (let i = 0; i < 4; i++){ const x = 5 + i * 13; P(g, roof, x - 1, 8, 11, 12); P(g, win, x, 9, 9, 10); P(g, winHi, x, 9, 3, 2); P(g, winHi, x, 11, 1, 2); } if (type === 'dining') for (let i = 0; i < 4; i++) P(g, '#ffd166', 8 + i * 13, 15, 3, 2); }
       P(g, '#3a2a1f', 0, 26, 60, 2);
     }
   }));
@@ -775,16 +789,46 @@ function stationSprite(roof){
     P(g, '#7a4b2b', 120, 44, 14, 2); P(g, '#5c361e', 121, 46, 2, 4); P(g, '#5c361e', 131, 46, 2, 4); P(g, '#7a4b2b', 120, 40, 14, 2);
   }));
 }
-// tiny people waiting on the platform
-const SKIN = ['#f1c9a5', '#d9a07a', '#a8714a', '#7a4e2f'], CLOTH = ['#b8322f', '#2f6fb0', '#3f8a3e', '#e8b23a', '#7a4ea8', '#e07a3a', '#4a4a5a'];
-function personSprite(i, rich){
-  const s = SKIN[i % 4], c = rich ? '#2c2c3a' : CLOTH[i % 7], h = ['#3a2416', '#7a4a22', '#d8b060', '#1a1a1a'][i % 4];
-  return outlined(mk(5, 12, g => {
-    P(g, s, 1, 3, 3, 3); P(g, h, 1, 2, 3, 1); P(g, c, 0, 6, 5, 4); P(g, '#3a2a2a', 1, 10, 1, 2); P(g, '#3a2a2a', 3, 10, 1, 2);
-    if (rich){ P(g, '#1a1a1a', 0, 1, 5, 1); P(g, '#1a1a1a', 1, 0, 3, 1); P(g, '#e8c35a', 2, 7, 1, 1); }
+// ---- people: one look (skin, hair, clothes, hat) used for window busts and platform travelers ----
+const SKIN = ['#f1c9a5', '#e0b088', '#c08a62', '#8a5a3a', '#5e3a24'], HAIRC = ['#3a2416', '#6a3a1a', '#c8963a', '#1a1a1a', '#a8a8a8', '#8a2a1a'];
+const CLOTH = ['#b8322f', '#2f6fb0', '#3f8a3e', '#c9902a', '#7a4ea8', '#d0683a', '#4a4a5a', '#2a7a7a'];
+function lookOf(seed, rich){
+  const h = k => hash(seed * 31 + k);
+  return { skin:SKIN[Math.floor(h(1) * 5)], hair:HAIRC[Math.floor(h(2) * 6)], cloth:rich ? '#24242e' : CLOTH[Math.floor(h(3) * 8)],
+    style:rich ? 'tophat' : ['short', 'long', 'cowboy', 'bun', 'bowler', 'bald', 'bonnet', 'short'][Math.floor(h(4) * 8)], beard:h(5) < .2, dress:!rich && h(6) < .4, bag:h(7) < .35, rich };
+}
+// head + hair/hat with its top-left at (X, Y) on canvas g; the head is 5 x 5 starting 2 rows down
+function drawHead(g, L, X, Y, blink){
+  const sk = L.skin, sh = shade(L.skin, -.18), hr = L.hair;
+  P(g, sk, X + 1, Y + 2, 5, 5); P(g, sh, X + 5, Y + 3, 1, 4);                                  // face with a shaded cheek
+  if (!blink){ P(g, '#24150f', X + 2, Y + 4, 1, 1); P(g, '#24150f', X + 4, Y + 4, 1, 1); } else { P(g, sh, X + 2, Y + 4, 1, 1); P(g, sh, X + 4, Y + 4, 1, 1); }
+  P(g, shade(sk, -.3), X + 3, Y + 6, 1, 1);                                                        // mouth
+  if (L.beard){ P(g, hr, X + 1, Y + 5, 5, 2); P(g, sk, X + 3, Y + 5, 1, 1); }
+  switch (L.style){
+    case 'short':  P(g, hr, X + 1, Y + 1, 5, 2); P(g, hr, X + 1, Y + 3, 1, 1); P(g, shade(hr, .25), X + 2, Y + 1, 2, 1); break;
+    case 'long':   P(g, hr, X + 1, Y + 1, 5, 2); P(g, hr, X, Y + 2, 1, 6); P(g, hr, X + 6, Y + 2, 1, 6); P(g, shade(hr, .25), X + 2, Y + 1, 2, 1); break;
+    case 'bun':    P(g, hr, X + 1, Y + 1, 5, 2); P(g, hr, X + 2, Y, 3, 1); P(g, hr, X + 3, Y - 1, 1, 1); break;
+    case 'bonnet': P(g, '#f2e6c8', X, Y + 1, 7, 2); P(g, '#f2e6c8', X, Y + 3, 1, 3); P(g, '#f2e6c8', X + 6, Y + 3, 1, 3); P(g, '#d8c8a0', X + 1, Y + 1, 5, 1); break;
+    case 'cowboy': P(g, '#7a4a22', X + 2, Y - 1, 3, 2); P(g, '#5a3416', X + 2, Y, 3, 1); P(g, '#7a4a22', X - 1, Y + 1, 9, 1); P(g, '#9a6a3a', X - 1, Y + 1, 3, 1); break;
+    case 'bowler': P(g, '#1a1a1a', X + 1, Y, 5, 2); P(g, '#3a3a3a', X + 2, Y, 2, 1); P(g, '#1a1a1a', X, Y + 2, 7, 1); break;
+    case 'tophat': P(g, '#1a1a1a', X + 1, Y - 3, 5, 5); P(g, '#7a2a2a', X + 1, Y, 5, 1); P(g, '#3a3a3a', X + 2, Y - 3, 1, 3); P(g, '#1a1a1a', X - 1, Y + 2, 9, 1); break;
+    case 'bald':   P(g, hr, X + 1, Y + 3, 1, 2); P(g, hr, X + 5, Y + 3, 1, 2); P(g, shade(sk, .2), X + 2, Y + 2, 2, 1); break;
+  }
+}
+// a whole traveler for the platform: 9 x 20 before the outline
+function personSprite(seed, rich){
+  const L = lookOf(seed, rich), c = L.cloth, cd = shade(c, -.25);
+  return outlined(mk(11, 22, g => {
+    drawHead(g, L, 2, 3, false);
+    P(g, c, 2, 10, 7, 6); P(g, shade(c, .2), 2, 10, 2, 6); P(g, cd, 8, 10, 1, 6);                 // coat
+    P(g, cd, 1, 10, 1, 5); P(g, cd, 9, 10, 1, 5); P(g, L.skin, 1, 15, 1, 1); P(g, L.skin, 9, 15, 1, 1);   // arms + hands
+    if (rich){ P(g, '#f2efe6', 5, 10, 1, 3); P(g, '#e8c35a', 6, 12, 1, 1); }
+    else P(g, '#f2efe6', 4, 10, 3, 1);                                                               // collar
+    if (L.dress){ P(g, c, 2, 16, 7, 3); P(g, c, 1, 18, 9, 1); P(g, cd, 1, 18, 9, 1); P(g, '#3a2a2a', 3, 19, 2, 1); P(g, '#3a2a2a', 6, 19, 2, 1); }
+    else { const pc = rich ? '#24242e' : ['#4a4a5a', '#3a3a4a', '#6a5a4a'][seed % 3]; P(g, pc, 3, 16, 2, 3); P(g, pc, 6, 16, 2, 3); P(g, '#24150f', 3, 19, 2, 1); P(g, '#24150f', 6, 19, 2, 1); }
+    if (L.bag && !rich){ P(g, '#7a4a22', 9, 16, 2, 3); P(g, '#5a3416', 9, 15, 2, 1); }
   }));
 }
-
 // ---- UI icons (16 x 16) ----
 function icon(draw){ return outlined(mk(16, 16, draw)).toDataURL(); }
 const ICONS = {
@@ -1005,17 +1049,18 @@ const V = {                                        // visual state (not saved)
   x:0, v:0, target:0, station:null, stationTown:null, decel:null, accel:0, smoke:[], snow:[], biome:'prairie', prevBiome:null, fade:1, float:[], arriveAt:0,
   depart(){ this.accel = 2.2; this.decel = null; },
   arrive(town){ const rolling = !!this.decel; if (rolling){ const d = this.decel; this.x = d.x0 + d.v0 * d.cruise + d.v0 * d.D / 2; } this.decel = null; this.v = 0; this.stationTown = town; if (!rolling || this.station === null) this.placeStation(); setBiome(TOWN[town].biome); },
-  placeStation(){ this.station = this.x + trainFront() - trainLen() / 2 - 75; },
+  placeStation(){ this.station = this.x + stationStopX(); },
 };
 const CRUISE = 64;
 function trainFront(){ return Math.round(BW * .7); }
+const stationStopX = () => trainFront() - 62;                // station's left edge when stopped: the platform's right end sits past the engine
 function trainLen(){ return 78 + G.train.cars.length * (CAR_W + 3); }
 let sprites = { loco:null, cars:{}, carsN:{}, station:{}, people:[] };
 function buildSprites(){
   sprites.loco = locoSprite(loco());
   for (const t of Object.keys(CARS)){ sprites.cars[t] = carSprite(t, false); sprites.carsN[t] = carSprite(t, true); }
   for (const t of TOWNS) sprites.station[t.id] = stationSprite(t.roof);
-  sprites.people = Array.from({ length:12 }, (_, i) => personSprite(i, i % 5 === 4));
+  sprites.people = Array.from({ length:16 }, (_, i) => personSprite(i * 7 + 3, i % 6 === 5));
 }
 function resize(){
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
@@ -1065,12 +1110,13 @@ function update(dt){
     const T = G.trip;
     T.el += dt;
     advanceDay(dt / SEC_PER_HOUR / 24);
+    { const use = (T.fuel || 0) * dt / T.secs; G.fuel = Math.max(0, G.fuel - use); T.burned = (T.burned || 0) + use; }   // coal burns as you go
     weatherTick();
     // approach: the station appears off the right edge while we cruise, then we brake and stop right at the platform.
     // it is timed so the stop lands exactly when the trip clock runs out
     if (!V.decel){
       const left = (T.segs - T.seg - 1) * segTime() + (segTime() - T.el);
-      const v0 = Math.max(20, V.v), D = 2.6, stopX = trainFront() - trainLen() / 2 - 75, dist = BW + 12 - stopX;
+      const v0 = Math.max(20, V.v), D = 2.6, stopX = stationStopX(), dist = BW + 12 - stopX;
       const cruise = Math.max(0, (dist - v0 * D / 2) / v0);
       if (left <= cruise + D){
         V.decel = { t:0, D, v0, cruise:Math.max(0, left - D), x0:V.x };
@@ -1175,8 +1221,11 @@ function drawScene(){
     if (sx > -200 && sx < BW + 50){
       bx.drawImage(sp, sx, trackY - sp.height + 2);
       if (G.town === V.stationTown){       // people waiting
-        const o = G.offers[G.town]; let n = 0; const want = Math.min(10, o.pax.reduce((s, p) => s + Math.ceil(p.n / 2), 0));
-        for (let i = 0; i < want; i++){ const p = sprites.people[(i + G.town.length) % 12]; const px0 = sx + 20 + ((i * 37) % 112) + (i > 5 ? 6 : 0); bx.drawImage(p, px0, trackY - 20 - (Math.sin(performance.now() / 300 + i) > .9 ? 1 : 0)); n++; }
+        const o = G.offers[G.town], want = Math.min(8, o.pax.reduce((s, p) => s + Math.ceil(p.n / 2.5), 0)), t = performance.now() / 1000;
+        for (let i = 0; i < want; i++){
+          const p = sprites.people[(i * 5 + G.town.charCodeAt(0)) % 16], px0 = sx + 68 + i * 10 + (i % 2 ? 2 : 0), hop = Math.sin(t * 2 + i * 1.7) > .93 ? 1 : 0;
+          bx.drawImage(p, px0, trackY - 7 - p.height + 1 - hop);
+        }
       }
     }
   }
@@ -1276,7 +1325,8 @@ function drawTrain(night){
     if (type === 'freight') drawCargo(x, y, i);
     bx.drawImage(sp, x, y);
     for (const wx of [10, 19, 40, 49]) wheel(x + wx, base - 3, 3, (V.x / 3) + wx);
-    if (night > .5 && type !== 'freight' && type !== 'smug') { /* windows glow drawn in drawLights */ }
+    if (['coach', 'luxury'].includes(type)) drawRiders(type, x, y, i);
+    if (V.req && V.req.car === i && G.trip) drawRequestBubble(x, y);
   }
   // loco
   const ly = base - L.height - 4 + bob;
@@ -1321,7 +1371,7 @@ function drawLights(night){
   // car windows
   let x = front - sprites.loco.width;
   bx.fillStyle = `rgba(255,190,90,${a * .35})`;
-  for (const type of G.train.cars){ x -= CAR_W + 3; if (type !== 'freight' && type !== 'smug') bx.fillRect(x + 2, trackY - 26, CAR_W - 2, 12); }
+  for (const type of G.train.cars){ x -= CAR_W + 3; if (!['freight', 'smug', 'tender'].includes(type)) bx.fillRect(x + 2, trackY - 26, CAR_W - 2, 12); }
   bx.fillRect(front - sprites.loco.width + 6, trackY - 31, 13, 11);
   // station lamps
   if (V.station !== null){ const sx = Math.round(V.station - V.x); for (const lx of [9, 141]){ bx.fillStyle = `rgba(255,210,110,${a * .4})`; disc(bx, sx + lx + 1, trackY - 30, 7, `rgba(255,210,110,${a * .25})`); } }
@@ -1348,6 +1398,7 @@ function refreshHud(){
     w.innerHTML = `<span>${esc(TOWN[T.from].n)} → ${esc(TOWN[T.to].n)}</span><span class="prog"><b style="width:${(f * 100).toFixed(1)}%"></b></span><span class="mi">${fmtMi(T.miles * (1 - f))} left</span>`;
   } else w.innerHTML = `<span>${esc(TOWN[G.town].n)} Station</span>`;
   const cond = Math.round(G.train.cond);
+  { const fc = fuelCap(), low = G.fuel < fc * .25; $('#fuelChip').innerHTML = `<img class="px" src="${GICON.coal}" alt=""><span style="color:${low ? '#b8322f' : '#2a1a14'}">${G.fuel.toFixed(1)}/${fc} t</span>`; }
   $('#dayChip').innerHTML = `Day ${Math.floor(G.day)} · ${clockText()} <span style="color:${cond < 40 ? '#b8322f' : cond < 70 ? '#c98f1a' : '#3f8a3e'}">♥${cond}%</span>`;
   // which buttons work right now
   const away = !!G.trip;
@@ -1397,7 +1448,10 @@ const PANELS = {
         <td class="r"><button class="btn" data-a="sell:${g.id}:1" ${!have ? 'disabled' : ''}>-1</button> <button class="btn ${pl > 0 ? 'go' : ''}" data-a="sell:${g.id}:${have}" ${!have ? 'disabled' : ''}>All${have ? ' ' + fmt(s * have) : ''}</button></td></tr>`;
     }).join('');
     const nEv = G.events.filter(e => e.town === t).length;
-    return panelShell('Market', `${TOWN[t].n}`, `<div class="capline"><span>Cargo ${used}/${cap}</span>${hideCap() ? `<span>Hidden hold ${moonUsed()}/${hideCap()}</span>` : ''}<span class="muted small grow">Prices fall as you sell and rise as you buy. They recover over a few days.</span></div>
+    const fp = fuelPrice(t), room = Math.max(0, fuelCap() - G.fuel), fillT = Math.min(room, Math.floor(G.money / fp * 10) / 10), fillCost = Math.ceil(fillT * fp);
+    const fuelCard = `<div class="card hl row">${gImg('coal')}<span class="grow"><b>Engine coal ${G.fuel.toFixed(1)} / ${fuelCap()} t</b><div class="bar" style="margin:3px 0"><i style="width:${G.fuel / fuelCap() * 100}%;background:${G.fuel < fuelCap() * .25 ? '#b8322f' : '#3a3a40'}"></i></div><div class="small muted">${fmt(fp)} per ton here · your engine burns ${burnPer100().toFixed(1)} t per 100 mi</div></span>
+      <button class="btn" data-a="fuel:1" ${room < .05 || G.money < fp ? 'disabled' : ''}>+1 t</button><button class="btn go" data-a="fuel:fill" ${fillT < .05 ? 'disabled' : ''}>${room < .05 ? 'Full' : `Fill ${fmt(fillCost)}`}</button></div>`;
+    return panelShell('Market', `${TOWN[t].n}`, fuelCard + `<div class="capline"><span>Cargo ${used}/${cap}</span>${hideCap() ? `<span>Hidden hold ${moonUsed()}/${hideCap()}</span>` : ''}<span class="muted small grow">Prices fall as you sell and rise as you buy. They recover over a few days.</span></div>
       <table class="mk"><tr><th>Good</th><th class="r">Buy</th><th class="r">Sell</th><th class="r">Have</th><th class="r"></th><th class="r"></th></tr>${rows}</table>
       ${nEv ? '' : ''}${newsList(4)}`);
   },
@@ -1415,7 +1469,7 @@ const PANELS = {
       }).join('') : '<div class="muted">The platform is empty. More travelers show up each day.</div>';
     }
     return panelShell('Passengers', `Seats ${paxUsed('std')}/${seats} · Luxury ${paxUsed('rich')}/${rich}`,
-      (G.trip ? '' : `<h3 style="margin:2px 0 6px">Waiting at ${TOWN[G.town].n}</h3>${waiting}`) + `<h3 style="margin:10px 0 6px">On board</h3>${onboard}<div class="small muted">Fares are paid when you stop at their station.</div>`);
+      (G.trip ? reservationBoard() : `<h3 style="margin:2px 0 6px">Waiting at ${TOWN[G.town].n}</h3>${waiting}`) + `<h3 style="margin:10px 0 6px">On board</h3>${onboard}<div class="small muted">Fares are paid when you stop at their station.</div>`);
   },
   con(){
     const act = G.contracts.length ? G.contracts.map(c => {
@@ -1444,7 +1498,7 @@ const PANELS = {
           return `<tr><td>${gImg(g.id)} ${g.n}</td><td class="r num">${fmt(b)}</td><td class="r num">${fmt(s)}</td><td class="r small">${hint}</td></tr>`; }).join('') + '</table>';
       }
       let go = '';
-      if (G.town && isNeighbor(G.town, sel)){ const p = tripPreview(sel); go = `<div class="card hl"><div><b>${fmtMi(p.miles)}</b> at ${Math.round(p.mph)} mph · ${hoursText(p.hours)} on the clock</div><div class="small muted">About ${realText(p.secs)} of riding · coal ${fmt(p.coal)}${G.freeCoal ? ` (${fmtMi(G.freeCoal)} free)` : ''}</div><button class="btn go big" data-a="go:${sel}" style="margin-top:6px;width:100%">All aboard! → ${t.n}</button></div>`; }
+      if (G.town && isNeighbor(G.town, sel)){ const p = tripPreview(sel); go = `<div class="card hl"><div><b>${fmtMi(p.miles)}</b> at ${Math.round(p.mph)} mph · ${hoursText(p.hours)} on the clock</div><div class="small muted">About ${realText(p.secs)} of riding</div><div class="small ${G.fuel + 1e-6 < p.fuel ? 'dn' : 'muted'}">Burns ${p.fuel.toFixed(1)} t of coal · you have ${G.fuel.toFixed(1)} t${p.fuel > fuelCap() ? ' · <b>too far for your tank</b>' : G.fuel + 1e-6 < p.fuel ? ' · <b>buy coal at the market</b>' : ''}</div><button class="btn go big" data-a="go:${sel}" style="margin-top:6px;width:100%" ${G.fuel + 1e-6 < p.fuel || p.fuel > fuelCap() ? 'disabled' : ''}>All aboard! → ${t.n}</button></div>`; }
       else if (G.town){ const r = route(G.town, sel).path; go = `<div class="card">No direct track from ${TOWN[G.town].n}. Stop in <b>${TOWN[r[1]].n}</b> first${r.length > 3 ? ` (shortest way: ${r.slice(1, -1).map(x => TOWN[x].n).join(' → ')})` : ''}.</div>`; }
       info = `<h3 style="margin:0">${t.n}</h3><div class="small muted">${BIOMES[t.biome].n} · ${['', 'small', 'medium', 'big'][t.size]} town${t.bank ? ' · bank' : ''}${t.shop ? ' · train yard' : ''}${t.shady ? ' · <span class="dn">lawless</span>' : ''}</div>
         <div style="margin:4px 0">Makes: ${t.prod.map(g => gImg(g)).join(' ')} &nbsp; Wants: ${wants}</div>${go}${pr}`;
@@ -1461,7 +1515,7 @@ const PANELS = {
     return panelShell('Train', `${L.n} · ${G.train.cars.length}/${L.cars} cars`, `
       <div class="card row"><span class="grow"><b>Condition ${Math.round(G.train.cond)}%</b><div class="bar" style="margin-top:3px"><i style="width:${G.train.cond}%;background:${G.train.cond < 40 ? '#b8322f' : G.train.cond < 70 ? '#e8b23a' : '#3f8a3e'}"></i></div><div class="small muted">Below 50% the train runs slow and breaks down more.</div></span>
         ${G.town ? `<button class="btn" data-a="repair" ${cost < 1 || G.money < cost ? 'disabled' : ''}>Repair ${fmt(cost)}</button>` : ''}</div>
-      <div class="card"><b>Engine: ${L.n}</b> <span class="small muted">${L.mph} mph · up to ${L.cars} cars · coal ${fmt(coalPer100())} per 100 mi</span>
+      <div class="card"><b>Engine: ${L.n}</b> <span class="small muted">${L.mph} mph · up to ${L.cars} cars · tank ${L.tank} t · burns ${burnPer100().toFixed(1)} t per 100 mi</span>
         ${next ? `<div class="row" style="margin-top:4px"><span class="grow small">Next: <b>${next.n}</b> (${next.mph} mph, ${next.cars} cars)</span>${shop ? `<button class="btn gold" data-a="loco" ${G.money < next.price ? 'disabled' : ''}>${fmt(next.price)}</button>` : `<span class="small muted">${fmt(next.price)} at a train yard</span>`}</div>` : '<div class="small">The finest engine on the rails.</div>'}</div>
       <h3 style="margin:8px 0 6px">Your cars</h3>${carsList}
       <h3 style="margin:8px 0 6px">Train yard</h3>${buy}`);
@@ -1527,9 +1581,14 @@ $('#panel').addEventListener('click', e => {
     case 'board': { const o = G.offers[t], p = o.pax.find(q => q.id === +x); if (!p) break; o.pax.splice(o.pax.indexOf(p), 1); G.pax.push(p); toast(`${p.n} passenger${p.n > 1 ? 's' : ''} boarded for ${TOWN[p.to].n}`, 'g'); break; }
     case 'take': { const o = G.offers[t], c = o.con.find(q => q.id === +x); if (!c || G.contracts.length >= 4) break; o.con.splice(o.con.indexOf(c), 1); G.contracts.push(c); toast('Contract accepted', 'g'); break; }
     case 'go': depart(x); return;
+    case 'fuel': { const fp = fuelPrice(t), room = fuelCap() - G.fuel; let tons = x === 'fill' ? Math.min(room, Math.floor(G.money / fp * 10) / 10) : Math.min(1, room);
+      if (tons > 0 && G.money >= Math.ceil(tons * fp)){ G.money -= Math.ceil(tons * fp); G.fuel = Math.min(fuelCap(), G.fuel + tons); G.mk[t].coal.press = clamp(G.mk[t].coal.press - .01 * tons, -.6, .75); toast(`Loaded ${tons.toFixed(1)} t of coal`, 'g'); } break; }
+    case 'reserve': { const T = G.trip; if (!T || T.reserved) break; const g = T.board.find(q => q.id === +x); if (!g || !fitsOnArrival(g)) break;
+      T.board.splice(T.board.indexOf(g), 1); T.reserved = g; toast(`Reserved ${g.n} to ${TOWN[g.to].n}. No changes now!`, 'g'); break; }
     case 'repair': { const cost = Math.ceil((100 - G.train.cond) * 3.2); if (G.money >= cost){ G.money -= cost; G.train.cond = 100; toast('Good as new!', 'g'); } break; }
-    case 'buycar': { const c = CARS[x]; if (G.money >= c.price && G.train.cars.length < loco().cars){ G.money -= c.price; G.train.cars.push(x); toast(`${c.n} coupled on!`, 'g'); if (V.stationTown) V.placeStation(); } break; }
+    case 'buycar': { const c = CARS[x]; if (G.money >= c.price && G.train.cars.length < loco().cars){ G.money -= c.price; if (x === 'tender') G.train.cars.unshift(x); else G.train.cars.push(x); toast(`${c.n} coupled on!`, 'g'); if (V.stationTown) V.placeStation(); } break; }
     case 'sellcar': { const i = +x, c = G.train.cars[i];
+      if (c === 'tender' && G.fuel > fuelCap() - CARS.tender.fuel){ toast('Burn or use the coal in it first', 'r'); break; }
       if (c === 'freight' && capOf() - CARS.freight.cap < cargoUsed()){ toast('Unload the cargo first', 'r'); break; }
       if (c === 'coach' && seatsOf() - CARS.coach.seats < paxUsed('std')){ toast('Passengers are sitting in it!', 'r'); break; }
       if (c === 'luxury' && richOf() - CARS.luxury.rich < paxUsed('rich')){ toast('Passengers are sitting in it!', 'r'); break; }
@@ -1551,13 +1610,10 @@ $('#panel').addEventListener('click', e => {
 // ---- the map ----
 // map marker: a tiny red-and-black engine, plus a mirrored copy for heading west
 const MAP_TRAIN = (() => {
-  const a = outlined(mk(14, 11, g => {
-    P(g, '#ececf2', 9, 0, 3, 2); P(g, '#ffffff', 10, 0, 1, 1); P(g, '#ececf2', 6, 1, 2, 1);      // smoke
-    P(g, '#b8322f', 0, 3, 5, 6); P(g, '#3a2a2a', 0, 2, 6, 1); P(g, '#ffe39a', 1, 4, 3, 2);         // cab + window
-    P(g, '#2b2d3a', 5, 5, 8, 4); P(g, '#4a4e63', 5, 5, 8, 1); P(g, '#b8322f', 8, 5, 1, 4);         // boiler
-    P(g, '#2b2d3a', 10, 2, 2, 3); P(g, '#d6a83c', 7, 4, 2, 1); P(g, '#ffe680', 13, 5, 1, 2);        // stack, dome, lamp
-    P(g, '#24150f', 1, 9, 2, 2); P(g, '#24150f', 6, 9, 3, 2); P(g, '#24150f', 10, 9, 3, 2);        // wheels
-    P(g, '#9aa0ab', 7, 9, 1, 1); P(g, '#9aa0ab', 11, 9, 1, 1);
+  const a = outlined(mk(8, 6, g => {
+    P(g, '#b8322f', 0, 1, 3, 4); P(g, '#ffe39a', 1, 2, 1, 1);                                  // cab
+    P(g, '#2b2d3a', 3, 2, 5, 3); P(g, '#2b2d3a', 6, 0, 1, 2); P(g, '#ffe680', 7, 2, 1, 1);       // boiler, stack, lamp
+    P(g, '#24150f', 1, 5, 1, 1); P(g, '#24150f', 4, 5, 1, 1); P(g, '#24150f', 6, 5, 1, 1);       // wheels
   }));
   const b = mk(a.width, a.height, g => { g.translate(a.width, 0); g.scale(-1, 1); g.drawImage(a, 0, 0); });
   return [a, b];
@@ -1594,7 +1650,7 @@ function drawMap(){
   for (const L of LAKES) poly(L, '#8fc0d8');
   for (let i = 0; i < 160; i++){ const x = hash(i * 3) * W | 0, y = hash(i * 5) * H | 0; if (g.getImageData(x, y, 1, 1).data[0] > 200) P(g, '#cbb57e', x, y, 2, 1); }
   // biome blobs
-  for (const t of TOWNS){ const col = BIOMES[t.biome].map; g.fillStyle = col; g.beginPath(); g.ellipse(X(t.id), Y(t.id), 10, 7, 0, 0, Math.PI * 2); g.fill(); }
+  for (const t of TOWNS){ const col = BIOMES[t.biome].map; g.fillStyle = col; g.beginPath(); g.ellipse(X(t.id), Y(t.id), 7, 5, 0, 0, Math.PI * 2); g.fill(); }
   // rails
   for (const [a, b] of EDGES){
     const x1 = X(a), y1 = Y(a), x2 = X(b), y2 = Y(b), n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
@@ -1606,7 +1662,7 @@ function drawMap(){
   if (G.town) for (const [b] of ADJ[G.town]){ const x1 = X(G.town), y1 = Y(G.town), x2 = X(b), y2 = Y(b), n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)); for (let i = 0; i <= n; i++) P(g, '#fff3c0', Math.round(x1 + (x2 - x1) * i / n), Math.round(y1 + (y2 - y1) * i / n), 1, 1); }
   if (sel) for (let k = 0; k < sel.length - 1; k++){ const x1 = X(sel[k]), y1 = Y(sel[k]), x2 = X(sel[k + 1]), y2 = Y(sel[k + 1]), n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)); for (let i = 0; i <= n; i++) P(g, '#e8b23a', Math.round(x1 + (x2 - x1) * i / n) - 1, Math.round(y1 + (y2 - y1) * i / n) - 1, 2, 2); }
   // towns
-  for (const t of TOWNS){ const x = X(t.id), y = Y(t.id); P(g, '#24150f', x - 3, y - 3, 7, 7); P(g, t.roof, x - 2, y - 2, 5, 5); P(g, shade(t.roof, .35), x - 2, y - 2, 5, 1); }
+  for (const t of TOWNS){ const x = X(t.id), y = Y(t.id); P(g, '#24150f', x - 2, y - 2, 5, 5); P(g, t.roof, x - 1, y - 1, 3, 3); P(g, shade(t.roof, .35), x - 1, y - 1, 3, 1); }
   // the train
   let tx, ty;
   if (G.town){ tx = X(G.town); ty = Y(G.town); }
@@ -1615,8 +1671,7 @@ function drawMap(){
   // a little steam engine (with a puff of smoke) facing the way you're going
   const right = G.trip ? X(G.trip.to) >= X(G.trip.from) : true;
   const sp = right ? MAP_TRAIN[0] : MAP_TRAIN[1], bob = G.trip && Math.floor(performance.now() / 250) % 2 ? 1 : 0;
-  g.imageSmoothingEnabled = false;
-  g.drawImage(sp, Math.round(tx) - sp.width, Math.round(ty) - sp.height * 2 - 1 - bob, sp.width * 2, sp.height * 2);
+  g.drawImage(sp, Math.round(tx) - (sp.width >> 1), Math.round(ty) - sp.height - bob);
   // labels (HTML, crisp)
   box.querySelectorAll('.lbl').forEach(l => l.remove());
   for (const t of TOWNS){
@@ -1655,6 +1710,233 @@ function showArrival(t, lines, fares, inspect){
 }
 
 // =====================================================================================
+//  passengers on the ride: faces in the windows, and a ❗ when someone wants something
+// =====================================================================================
+const P_SKIN = ['#f1c9a5', '#d9a07a', '#a8714a', '#7a4e2f'], P_HAIR = ['#3a2416', '#7a4a22', '#d8b060', '#1a1a1a', '#a8a8a8'], P_CLOTH = ['#2f6fb0', '#3f8a3e', '#e8b23a', '#7a4ea8', '#e07a3a', '#4a4a5a', '#b8322f'];
+const WINDOW_ORDER = [2, 0, 4, 1, 3];
+// busts in a car's windows (x, y = where the car sprite was drawn); 4 windows, the passengers blink now and then
+function drawRiders(type, x, y, carIdx){
+  const rich = type === 'luxury', same = G.train.cars.slice(0, carIdx).filter(c => c === type).length;
+  const seated = rich ? clamp(paxUsed('rich') - same * CARS.luxury.rich, 0, CARS.luxury.rich) : clamp(paxUsed('std') - same * CARS.coach.seats, 0, CARS.coach.seats);
+  const wins = Math.min(4, Math.ceil(seated / (rich ? 1.5 : 2.5))), t = performance.now() / 1000;
+  for (let k = 0; k < wins; k++){
+    const i = [1, 2, 0, 3][k], X = x + 1 + 5 + i * 13, Y = y + 1 + 9, seed = carIdx * 11 + i * 3 + (rich ? 50 : 0), L = lookOf(seed, rich);
+    bx.save(); bx.beginPath(); bx.rect(X, Y, 9, 10); bx.clip();
+    const sway = Math.sin(t * 1.3 + seed) > .85 ? 1 : 0, blink = (t * 1.7 + seed * .37) % 4 < .15;
+    P(bx, L.cloth, X + 1, Y + 8, 7, 2); P(bx, shade(L.cloth, .2), X + 1, Y + 8, 2, 2); P(bx, rich ? '#f2efe6' : shade(L.cloth, -.3), X + 4, Y + 8, 1, 2);
+    drawHead(bx, L, X + 1 + sway, Y + 1 + (rich ? 1 : 0), blink);
+    bx.restore();
+  }
+}
+// the ❗ bubble over a car
+function drawRequestBubble(x, y){
+  const bob = Math.round(Math.sin(performance.now() / 180) * 1.5), bx0 = Math.round(x + CAR_W / 2 - 6), by0 = y - 17 + bob;
+  P(bx, '#24150f', bx0, by0, 13, 14); P(bx, '#ffffff', bx0 + 1, by0 + 1, 11, 12); P(bx, '#ffe9a0', bx0 + 1, by0 + 10, 11, 3);
+  P(bx, '#24150f', bx0 + 5, by0 + 15, 3, 1); P(bx, '#24150f', bx0 + 6, by0 + 14, 1, 2);                // little tail
+  P(bx, '#e24b3b', bx0 + 5, by0 + 3, 3, 5); P(bx, '#e24b3b', bx0 + 5, by0 + 9, 3, 2);
+  V.req.hit = [bx0 - 8, by0 - 8, 29, 30];
+}
+// who might want something: a car with people in it
+function riderCars(){ const out = []; G.train.cars.forEach((c, i) => { if (c === 'coach' && paxUsed('std') > G.train.cars.slice(0, i).filter(q => q === 'coach').length * 10) out.push(i); if (c === 'luxury' && paxUsed('rich') > G.train.cars.slice(0, i).filter(q => q === 'luxury').length * 6) out.push(i); }); return out; }
+function requestTick(dt){
+  if (V.req){ V.req.life -= dt; if (V.req.life <= 0 || V.decel || !G.trip){ if (V.req.life <= 0) toast('The passenger gave up waiting.'); V.req = null; } return; }
+  if (!G.trip || paused || V.decel || !$('#modal').hidden) return;
+  const cars = riderCars(); if (!cars.length) return;
+  V.reqT = (V.reqT == null ? 8 : V.reqT) - dt;
+  if (V.reqT > 0) return;
+  V.reqT = 16 + Math.random() * 22;
+  const car = pick(cars);
+  V.req = { car, rich:G.train.cars[car] === 'luxury', life:24 };
+  if (!G.hintReq){ G.hintReq = 1; toast('A passenger wants something. Tap the ❗', 'g'); }
+}
+cv.addEventListener('pointerdown', e => {
+  if (!V.req || !V.req.hit) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3), mx = e.clientX * dpr / K, my = e.clientY * dpr / K, [hx, hy, hw, hh] = V.req.hit;
+  if (mx >= hx && mx <= hx + hw && my >= hy && my <= hy + hh) openRequest();
+});
+
+// ---- what they want ----
+const TRIVIA = [
+  ['How many sides does a die have?', '6', ['4', '8', '12']], ['What is the capital of the United States?', 'Washington, D.C.', ['New York', 'Boston', 'Philadelphia']],
+  ['Which ocean is off the West Coast?', 'Pacific', ['Atlantic', 'Indian', 'Arctic']], ['How many states are in the USA?', '50', ['48', '52', '45']],
+  ['Which city is called the Big Apple?', 'New York', ['Boston', 'Atlanta', 'Detroit']], ['How many hours are in a day?', '24', ['12', '20', '36']],
+  ['Which is the largest planet?', 'Jupiter', ['Saturn', 'Mars', 'Earth']], ['What do bees make?', 'Honey', ['Milk', 'Wax only', 'Syrup']],
+  ['How many minutes are in an hour?', '60', ['100', '30', '50']], ['What is 7 × 8?', '56', ['54', '48', '64']],
+  ['Which city has the Golden Gate Bridge?', 'San Francisco', ['Seattle', 'Boston', 'New York']], ['Which desert city is famous for casinos?', 'Las Vegas', ['Phoenix', 'Albuquerque', 'Denver']],
+  ['What is the tallest mountain in the world?', 'Everest', ['K2', 'Denali', 'Kilimanjaro']], ['How many legs does a spider have?', '8', ['6', '10', '4']],
+  ['At what °F does water boil?', '212', ['100', '180', '250']], ['Who was the first U.S. president?', 'George Washington', ['Abraham Lincoln', 'Thomas Jefferson', 'John Adams']],
+  ['Nashville is in which state?', 'Tennessee', ['Kentucky', 'Georgia', 'Alabama']], ['Which city is famous for making cars?', 'Detroit', ['Denver', 'Savannah', 'Phoenix']],
+  ['What is a baby horse called?', 'Foal', ['Calf', 'Cub', 'Kid']], ['Which planet is the Red Planet?', 'Mars', ['Venus', 'Jupiter', 'Mercury']],
+  ['How many cards in a deck (no jokers)?', '52', ['48', '54', '50']], ['In blackjack, what number are you aiming for?', '21', ['20', '22', '31']],
+  ['Which metal sticks to a magnet?', 'Iron', ['Gold', 'Copper', 'Silver']], ['Which city has the Space Needle?', 'Seattle', ['Denver', 'Minneapolis', 'Kansas City']],
+  ['What is H₂O?', 'Water', ['Salt', 'Air', 'Oil']], ['In what year did the U.S. declare independence?', '1776', ['1812', '1492', '1865']],
+  ['How many continents are there?', '7', ['5', '6', '8']], ['A shape with three sides is a…', 'Triangle', ['Square', 'Pentagon', 'Circle']],
+  ['Which way does the sun rise?', 'East', ['West', 'North', 'South']], ['At what °C does water freeze?', '0', ['32', '10', '-10']],
+  ['Pittsburgh is famous for making…', 'Steel', ['Cars', 'Oranges', 'Cotton']], ['What is half of 150?', '75', ['70', '65', '80']],
+  ['Which bird is a symbol of the USA?', 'Bald eagle', ['Turkey', 'Hawk', 'Owl']], ['What does a steam engine burn?', 'Coal', ['Gasoline', 'Batteries', 'Hay']],
+  ['How many days are in a leap year?', '366', ['365', '364', '360']], ['What color do you get mixing blue and yellow?', 'Green', ['Purple', 'Orange', 'Brown']],
+];
+function triviaQ(){
+  if (Math.random() < .3){       // questions about this world
+    const g = pick(GOODS.filter(x => TOWNS.some(t => t.prod.includes(x.id)))), yes = pick(TOWNS.filter(t => t.prod.includes(g.id))), no = shuffle(TOWNS.filter(t => !t.prod.includes(g.id))).slice(0, 3);
+    return [`On these rails, which city produces ${g.n.toLowerCase()}?`, yes.n, no.map(t => t.n)];
+  }
+  return pick(TRIVIA);
+}
+function openRequest(force){
+  if (!V.req || V.decel) return;
+  const req = V.req; paused = true;
+  const kinds = [['trivia', 3], ['dice', 2], ['blackjack', 2], ['drink', 2], ['tip', 1], ['dodger', req.rich ? 0 : 1], ['complaint', 1], ['buy', cargoKeys().length ? 3 : 0]];
+  const tot = kinds.reduce((s, k) => s + k[1], 0); let q = Math.random() * tot, kind = 'trivia'; for (const [k, w] of kinds){ q -= w; if (q <= 0){ kind = k; break; } }
+  if (force) kind = force;
+  const who = req.rich ? 'A gentleman in a top hat' : pick(['A cowboy', 'A schoolteacher', 'A traveling salesman', 'A grandma', 'A young farmhand', 'A miner', 'A preacher', 'A banker\'s clerk']);
+  const rich = req.rich ? 3 : 1;
+  const done = (txt, ok) => { modal(`<h3>Passenger</h3><div class="t">${txt}</div><div class="ch"><button class="btn go" data-x>Back to the ride</button></div>`, e => { if (e.target.closest('[data-x]')) endRequest(); }); refreshHud(); };
+  const ask = (title, text, choices) => modal(`<h3>${esc(title)}</h3><div class="t">${text}</div><div class="ch">${choices.map((c, i) => `<button class="btn ${c.cls || ''}" data-c="${i}" ${c.off ? 'disabled' : ''}>${c.t}</button>`).join('')}</div>`,
+    e => { const b = e.target.closest('[data-c]'); if (b && !b.disabled) choices[+b.dataset.c].f(); });
+  if (kind === 'trivia'){
+    const [qq, ans, wrong] = triviaQ(), opts = shuffle([ans, ...wrong]), tip = ri(10, 25) * rich;
+    ask(`${who} has a question`, `"${esc(qq)}"<div class="small muted" style="margin-top:4px">Get it right for a ${fmt(tip)} tip.</div>`,
+      opts.map(o => ({ t:esc(o), f:() => o === ans ? (G.money += tip, done(`"Right you are!" They tip you <b class="up">${fmt(tip)}</b>.`)) : done(`"Ha! It's <b>${esc(ans)}</b>." No tip this time.`) })));
+  } else if (kind === 'drink'){
+    const p = has('dining') ? ri(10, 16) * rich : ri(3, 6) * rich;
+    ask(`${who} is thirsty`, `"Could I trouble you for a coffee?"${has('dining') ? ' <span class="small muted">(the dining car serves a proper cup)</span>' : ''}`,
+      [{ t:`Serve it (+${fmt(p)})`, cls:'go', f:() => { G.money += p; done(`"Much obliged!" +${fmt(p)}`); } }, { t:'Sorry, the pot\'s empty', f:() => done('"Hmph."') }]);
+  } else if (kind === 'tip'){
+    const t = pick(TOWNS.filter(x => x.id !== G.trip.to)), g = GOODS.slice().sort((a, b) => G.mk[t.id][b.id].mult - G.mk[t.id][a.id].mult)[ri(0, 1)];
+    G.news.unshift({ day:Math.floor(G.day), txt:`Tip from a passenger: ${t.n} pays well for ${g.n.toLowerCase()}.` });
+    done(`${who} leans over: "Word is, folks in <b>${t.n}</b> pay top dollar for <b>${g.n.toLowerCase()}</b>." <div class="small muted">Saved to your news.</div>`);
+  } else if (kind === 'dodger'){
+    const fare = ri(15, 35);
+    ask('Fare dodger!', 'Your crew found a fellow hiding in the coach without a ticket.',
+      [{ t:`Make him pay (${fmt(fare)})`, cls:'go', f:() => { if (Math.random() < .8){ G.money += fare; done(`He grumbles and pays up. +${fmt(fare)}`); } else done('He empties his pockets: three buttons and a marble.'); } },
+       { t:'Let it slide', f:() => { const lucky = Math.random() < .25, v = ri(40, 90); if (lucky) G.money += v; done(lucky ? `At the next water stop he presses ${fmt(v)} into your hand. "For your kindness."` : 'He thanks you and naps the rest of the way.'); } }]);
+  } else if (kind === 'complaint'){
+    const smell = (G.cargo.cattle ? 'the cattle' : pick(['the coal smoke', 'the fella in seat 9', 'the bumpy track']));
+    ask(`${who} is upset`, `"I want to complain about ${smell}!"`,
+      [{ t:'Refund part of the fare ($10)', f:() => { G.money -= 10; done('They settle back, satisfied.'); } },
+       { t:'Offer a free coffee', f:() => { if (Math.random() < .6) done('That did the trick.'); else { G.trip.sick = true; done('"Coffee? COFFEE?" The whole car is grumbling now. Fares will be lower this trip.'); } } },
+       { t:'Ignore them', f:() => { G.trip.sick = Math.random() < .5 || G.trip.sick; done(G.trip.sick ? 'The grumbling spreads. Fares will be lower this trip.' : 'They give up and look out the window.'); } }]);
+  } else if (kind === 'buy'){
+    const g = pick(cargoKeys()), have = G.cargo[g], n = Math.min(have, ri(1, 3)), each = Math.round(GOOD[g].base * rf(1.1, 1.7) * (req.rich ? 1.3 : 1));
+    const sell = (k, p) => { G.cargo[g] -= k; if (!G.cargo[g]) delete G.cargo[g]; G.money += k * p; };
+    ask(`${who} wants to buy`, `"I'll give you <b>${fmt(each)}</b> each for ${n} ${GOOD[g].n.toLowerCase()}." <div class="small muted">You paid about ${fmt(G.paid[g] || 0)} each.</div>`,
+      [{ t:`Deal (+${fmt(each * n)})`, cls:'go', f:() => { sell(n, each); done(`Sold! +${fmt(each * n)}`); } },
+       { t:'Haggle for more', f:() => { if (Math.random() < .5){ const p2 = Math.round(each * 1.25); sell(n, p2); done(`"Fine, fine." Sold for ${fmt(p2)} each. +${fmt(p2 * n)}`); } else done('"Forget it then!" They storm off.'); } },
+       { t:'Not for sale', f:() => done('"Suit yourself."') }]);
+  } else if (kind === 'dice') diceGame(who, rich);
+  else blackjack(who, rich);
+}
+function endRequest(){ closeModal(); V.req = null; paused = false; save(); refreshHud(); rerender(); }
+function betChoices(rich){ return [10, 25, 50, 100].map(v => v * (rich > 1 ? 2 : 1)).filter(v => v <= Math.max(10, G.money)); }
+
+// ---- dice: the passenger offers bets ("bet $45 to win $100 that it's 3 or more"); some offers are generous, some are rip-offs ----
+function diceGame(who, rich){
+  const CONDS = [
+    ...[2, 3, 4, 5, 6].map(k => [`${k} or more`, v => v >= k, (7 - k) / 6]),
+    ...[1, 2, 3, 4, 5].map(k => [`${k} or less`, v => v <= k, k / 6]),
+    ...[1, 2, 3, 4, 5, 6].map(k => [`exactly ${k}`, v => v === k, 1 / 6]),
+    ['an even number', v => v % 2 === 0, .5], ['an odd number', v => v % 2 === 1, .5],
+  ];
+  const offer = () => {
+    const [txt, test, p] = pick(CONDS), stake = Math.max(5, Math.round(rf(8, 60) * rich / 5) * 5);
+    const fair = stake * (1 - p) / p, win = Math.max(5, Math.round(fair * rf(.6, 1.4) / 5) * 5);   // the passenger's offer can be good or bad
+    return { txt, test, stake, win };
+  };
+  const face = v => `<span class="die">${v}</span>`;
+  let offers;
+  const draw = () => {
+    offers = Array.from({ length:ri(2, 3) }, offer);
+    modal(`<h3>Dice with ${esc(who.toLowerCase())}</h3><div class="t">"One die, one roll. Here's what I'll give you…"</div>
+      <div class="ch">${offers.map((o, i) => `<button class="btn" data-o="${i}" ${G.money < o.stake ? 'disabled' : ''}>Bet <b>${fmt(o.stake)}</b> to win <b class="up">${fmt(o.win)}</b> if it's <b>${o.txt}</b></button>`).join('')}
+      <button class="btn" data-x>No bet</button></div>`,
+      e => { const t = e.target.closest('button'); if (!t || t.disabled) return; if (t.dataset.x != null) return endRequest(); roll(offers[+t.dataset.o]); });
+  };
+  const roll = o => {
+    G.money -= o.stake; refreshHud();
+    const v = ri(1, 6); let k = 0;
+    modal(`<h3>Rolling…</h3><div class="t" style="text-align:center">${face('?')}<div class="small muted" style="margin-top:6px">Needs ${o.txt}</div></div>`, () => {});
+    const spin = setInterval(() => { const m = $('#modal .die'); if (m) m.textContent = ri(1, 6); if (++k > 8){ clearInterval(spin); finish(o, v); } }, 70);
+  };
+  const finish = (o, v) => {
+    const won = o.test(v); if (won) G.money += o.stake + o.win;
+    modal(`<h3>${won ? 'You win!' : 'Passenger wins'}</h3><div class="t" style="text-align:center">${face(v)}<div style="margin-top:6px">Needed ${o.txt}: ${won ? `<b class="up">+${fmt(o.win)}</b>` : `<b class="dn">-${fmt(o.stake)}</b>`}</div></div>
+      <div class="ch"><button class="btn go" data-again>Another roll</button><button class="btn" data-x>That's enough</button></div>`,
+      e => { if (e.target.closest('[data-again]')) draw(); else if (e.target.closest('[data-x]')) endRequest(); });
+    refreshHud();
+  };
+  draw();
+}
+
+// ---- blackjack against the passenger (they deal, hit to 17; blackjack pays 3:2) ----
+function blackjack(who, rich){
+  const SUITS = ['♠', '♥', '♦', '♣'], RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  let bet = betChoices(rich)[0] || 10, deck, me, them;
+  const val = h => { let v = 0, a = 0; for (const c of h){ v += c.r === 'A' ? 11 : 'JQK'.includes(c.r) ? 10 : +c.r; if (c.r === 'A') a++; } while (v > 21 && a){ v -= 10; a--; } return v; };
+  const show = (h, hide) => h.map((c, i) => hide && i === 1 ? '<span class="pc back">?</span>' : `<span class="pc ${'♥♦'.includes(c.s) ? 'red' : ''}">${c.r}${c.s}</span>`).join('');
+  const table = (hide, msg) => `<div class="t"><div class="small muted">${esc(who)} (dealer) ${hide ? '' : '· ' + val(them)}</div><div class="hand">${show(them, hide)}</div>
+      <div class="small muted" style="margin-top:6px">You · ${val(me)}</div><div class="hand">${show(me)}</div>${msg ? `<div style="margin-top:6px">${msg}</div>` : ''}</div>`;
+  const betting = () => modal(`<h3>Blackjack</h3><div class="t">"Fancy a hand of blackjack? Closest to 21 wins."<div class="row" style="margin-top:6px;flex-wrap:wrap"><span class="small">Bet</span>${betChoices(rich).map(v => `<button class="btn ${v === bet ? 'gold' : ''}" data-bet="${v}">${fmt(v)}</button>`).join('')}</div></div>
+      <div class="ch"><button class="btn go" data-deal>Deal (${fmt(bet)})</button><button class="btn" data-x>No thanks</button></div>`,
+    e => { const t = e.target.closest('button'); if (!t) return; if (t.dataset.bet){ bet = +t.dataset.bet; betting(); } else if (t.dataset.deal != null) deal(); else if (t.dataset.x != null) endRequest(); });
+  const deal = () => {
+    if (G.money < bet) return toast('Not enough money', 'r');
+    G.money -= bet; refreshHud();
+    deck = shuffle(SUITS.flatMap(s => RANKS.map(r => ({ r, s })))); me = [deck.pop(), deck.pop()]; them = [deck.pop(), deck.pop()];
+    if (val(me) === 21) return end(val(them) === 21 ? 'push' : 'bj');
+    play();
+  };
+  const play = () => modal(`<h3>Blackjack · ${fmt(bet)}</h3>${table(true)}<div class="ch"><button class="btn go" data-hit>Hit</button><button class="btn gold" data-stand>Stand</button>${G.money >= bet && me.length === 2 ? `<button class="btn" data-dbl>Double down (${fmt(bet * 2)})</button>` : ''}</div>`,
+    e => { const t = e.target.closest('button'); if (!t) return;
+      if (t.dataset.hit != null){ me.push(deck.pop()); if (val(me) > 21) end('bust'); else if (val(me) === 21) stand(); else play(); }
+      else if (t.dataset.dbl != null){ G.money -= bet; bet *= 2; me.push(deck.pop()); if (val(me) > 21) end('bust'); else stand(); }
+      else if (t.dataset.stand != null) stand(); });
+  const stand = () => { while (val(them) < 17) them.push(deck.pop()); const a = val(me), b = val(them); end(b > 21 || a > b ? 'win' : a === b ? 'push' : 'lose'); };
+  const end = r => {
+    const pay = r === 'bj' ? Math.round(bet * 2.5) : r === 'win' ? bet * 2 : r === 'push' ? bet : 0;
+    G.money += pay;
+    const msg = { bj:`<b class="up">Blackjack! +${fmt(pay - bet)}</b>`, win:`<b class="up">You win! +${fmt(bet)}</b>`, push:'Push. Your bet comes back.', lose:`<b class="dn">Dealer wins. -${fmt(bet)}</b>`, bust:`<b class="dn">Bust! -${fmt(bet)}</b>` }[r];
+    modal(`<h3>Blackjack</h3>${table(false, msg)}<div class="ch"><button class="btn go" data-again>Another hand</button><button class="btn" data-x>Cash out</button></div>`,
+      e => { if (e.target.closest('[data-again]')){ bet = Math.min(bet, Math.max(10, G.money)); betting(); } else if (e.target.closest('[data-x]')) endRequest(); });
+    refreshHud();
+  };
+  betting();
+}
+
+// ---- reservations: a live board of travelers waiting at your next stop (one pick per trip, no take-backs) ----
+function makeGroup(from){
+  const t = TOWN[from], to = pick(TOWNS.filter(x => x.id !== from)).id, d = route(from, to).d, rich = Math.random() < .2 + .06 * t.size;
+  const life = 25 + Math.random() * 55;
+  return { id:G.cid++, to, cls:rich ? 'rich' : 'std', n:rich ? ri(1, 3) : ri(2, 9), fare:Math.round((7 + d * .8) * (rich ? rf(3, 4) : rf(.9, 1.2))), life, max:life };
+}
+function fitsOnArrival(g){
+  const T = G.trip, stay = G.pax.filter(p => p.cls === g.cls && p.to !== T.to).reduce((s, p) => s + p.n, 0);
+  return (g.cls === 'rich' ? richOf() : seatsOf()) - stay >= g.n;
+}
+function boardTick(dt){
+  const T = G.trip; if (!T || paused) return;
+  if (!T.board){ T.board = []; T.boardT = 0; }
+  for (const g of T.board) g.life -= dt;
+  T.board = T.board.filter(g => g.life > 0);
+  T.boardT -= dt;
+  if (T.boardT <= 0){ T.boardT = 3 + Math.random() * 7; if (T.board.length < 6) T.board.push(makeGroup(T.to)); }
+}
+function reservationBoard(){
+  const T = G.trip, dest = TOWN[T.to].n;
+  const mine = T.reserved ? `<div class="card hl row"><span class="grow"><b>Reserved:</b> ${T.reserved.n} × ${T.reserved.cls === 'rich' ? '<b>Rich</b>' : 'Regular'} to <b>${TOWN[T.reserved.to].n}</b><div class="small muted">Locked in. They board when you reach ${dest}.</div></span><span class="num up">${fmt(T.reserved.fare * T.reserved.n)}</span></div>` : '';
+  const rows = T.board.length ? T.board.map(g => { const ok = !T.reserved && fitsOnArrival(g);
+    return `<div class="card row"><span class="grow">${g.n} × ${g.cls === 'rich' ? '<b>Rich</b> <span class="tag e">LUXURY</span>' : 'Regular'} to <b>${TOWN[g.to].n}</b><div class="small muted">${fmt(g.fare)} each</div><div class="bar" style="max-width:140px;margin-top:2px"><i data-life="${g.id}" style="width:${g.life / g.max * 100}%;background:#e8b23a"></i></div></span>
+      <span class="num">${fmt(g.fare * g.n)}</span><button class="btn go" data-a="reserve:${g.id}" ${ok ? '' : 'disabled'}>${T.reserved ? 'Taken' : ok ? 'Reserve' : 'No seats'}</button></div>`; }).join('') : '<div class="muted">Nobody yet. Keep watching: travelers come and go.</div>';
+  return `<h3 style="margin:2px 0 4px">Live at ${dest} station</h3><div class="small muted" style="margin-bottom:6px">Reserve ONE group per trip. Once you reserve, you can't swap or cancel, so choose well. The bar is how long they'll wait.</div>${mine}${rows}`;
+}
+let boardSig = '';
+function liveBoard(){
+  const T = G.trip, sig = T.board.map(g => g.id).join() + '|' + (T.reserved ? T.reserved.id : '');
+  if (sig !== boardSig){ boardSig = sig; renderPanel(); return; }
+  for (const g of T.board){ const el = document.querySelector(`[data-life="${g.id}"]`); if (el) el.style.width = (g.life / g.max * 100) + '%'; }
+}
+
+// =====================================================================================
 //  loop + start
 // =====================================================================================
 let last = performance.now(), hudT = 0, saveT = 0;
@@ -1663,8 +1945,10 @@ function frame(now){
   if (G){
     update(dt);
     accrue(dt);
+    requestTick(dt);
+    boardTick(dt);
     drawScene();
-    hudT -= dt; if (hudT <= 0){ hudT = .25; refreshHud(); if (panelName === 'map' && G.trip) drawMap(); }
+    hudT -= dt; if (hudT <= 0){ hudT = .25; refreshHud(); if (panelName === 'map' && G.trip) drawMap(); if (panelName === 'pax' && G.trip) liveBoard(); }
     saveT -= dt; if (saveT <= 0){ saveT = 5; save(); }
     newsTimer -= dt; if (newsTimer < 0) $('#news').style.opacity = 0;
     dispMoney += (G.money - dispMoney) * Math.min(1, dt * 6); if (Math.abs(G.money - dispMoney) < 1) dispMoney = G.money;
@@ -1693,7 +1977,7 @@ addEventListener('resize', () => { resize(); if (panelName === 'map') drawMap();
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else if (G){ const sec = Math.min(8 * 3600, Math.max(0, (Date.now() - G.wall) / 1000)); if (sec > 30){ const v = Math.round(incomePerHour() * sec / 3600); if (v > 0){ G.money += v; toast(`Your businesses earned ${fmt(v)} while you were away`, 'g'); } } G.wall = Date.now(); } });
 addEventListener('pagehide', save);
 // test hooks
-window.__pr = { get G(){ return G; }, V, sceneryAt, pickMap:id => { tabs.map = id; renderPanel(); }, depart, openPanel, closePanel, segmentDone, roadEvent, refreshHud, newGame:() => { newGame(); buildSprites(); V.arrive(G.town); } };
+window.__pr = { get G(){ return G; }, V, sceneryAt, openRequest, pickMap:id => { tabs.map = id; renderPanel(); }, depart, openPanel, closePanel, segmentDone, roadEvent, refreshHud, newGame:() => { newGame(); buildSprites(); V.arrive(G.town); } };
 boot();
 })();
 </script>
