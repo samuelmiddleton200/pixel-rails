@@ -109,6 +109,11 @@ img.px{image-rendering:pixelated}
 #where .prog{width:90px;height:10px;margin-left:8px;border:2px solid var(--ink);border-radius:3px;background:var(--paper-d);overflow:hidden;flex:none}
 #where .prog b{display:block;height:100%;background:var(--gold)}
 #where .mi{margin-left:8px;font-size:13px;color:#7a5a3c}
+#pauseBtn{cursor:pointer;font:700 14px var(--px);padding:3px 10px 4px}
+#pauseBtn.on{background:#ffd166}
+#pausedBanner{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);background:rgba(42,26,20,.85);color:#ffd166;border:3px solid #ffd166;border-radius:10px;padding:8px 22px;font:700 26px var(--px);text-align:center;pointer-events:none}
+#pausedBanner small{display:block;font:600 13px var(--body);color:#fbe7b5;margin-top:2px}
+#pausedBanner[hidden]{display:none}
 #news{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 46px);max-width:70%;
   background:rgba(42,26,20,.82);color:#fbe7b5;border-radius:6px;padding:3px 10px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;transition:opacity .4s}
 #news b{color:#ffd166}
@@ -209,8 +214,10 @@ table.mk img{width:22px;height:22px;vertical-align:middle}
     <div class="chip" id="where"></div>
     <div class="chip" id="fuelChip"></div>
     <div class="chip" id="dayChip"></div>
+    <button class="chip" id="pauseBtn" aria-label="Pause" hidden>❚❚</button>
   </div>
   <div id="news"></div>
+  <div id="pausedBanner" hidden>PAUSED<small>Tap ▶ to roll on</small></div>
   <div id="panel" hidden></div>
   <div id="bar"></div>
   <div id="toasts"></div>
@@ -556,7 +563,7 @@ function arrive(){
   lines.push([`${fmtMi(T.miles)} in ${hoursText(T.hours || T.secs / SEC_PER_HOUR)}`, 0]);
   if (T.burned) lines.push([`Burned ${T.burned.toFixed(1)} t of coal (${G.fuel.toFixed(1)} t left)`, 0]);
   lines.push(...T.log);
-  G.trip = null; G.town = to;
+  G.trip = null; G.town = to; G.paused = false;
   // fares
   let fares = 0;
   const mult = (1 + .06 * skill('conductor')) * (has('dining') ? 1.15 : 1) * (T.sick ? .8 : 1);
@@ -1106,7 +1113,7 @@ function lightAt(tod){
 
 function update(dt){
   // trip clock
-  if (G.trip && !paused){
+  if (G.trip && !paused && !G.paused){
     const T = G.trip;
     T.el += dt;
     advanceDay(dt / SEC_PER_HOUR / 24);
@@ -1131,14 +1138,15 @@ function update(dt){
   }
   // speed
   if (V.decel){
-    const d = V.decel; d.t += dt;
+    const d = V.decel; if (!G.paused) d.t += dt;
     const tb = d.t - d.cruise;                                   // time since braking started
     V.v = tb <= 0 ? d.v0 : Math.max(0, d.v0 * (1 - tb / d.D));
     const s = tb <= 0 ? d.v0 * d.t : d.v0 * d.cruise + d.v0 * Math.min(tb, d.D) - d.v0 * Math.min(tb, d.D) ** 2 / (2 * d.D);
+    if (G.paused) V.v = 0;
     V.x = d.x0 + s - V.v * dt;                                   // the line below adds v*dt back
   }
   else if (G.trip){
-    const target = paused ? CRUISE * .35 : CRUISE * (.8 + .2 * loco().speed);
+    const target = G.paused ? 0 : paused ? CRUISE * .35 : CRUISE * (.8 + .2 * loco().speed);
     V.v += (target - V.v) * Math.min(1, dt * (V.accel > 0 ? .9 : 1.5)); V.accel = Math.max(0, V.accel - dt);
   } else V.v = 0;
   V.x += V.v * dt;
@@ -1400,6 +1408,8 @@ function refreshHud(){
   const cond = Math.round(G.train.cond);
   { const fc = fuelCap(), low = G.fuel < fc * .25; $('#fuelChip').innerHTML = `<img class="px" src="${GICON.coal}" alt=""><span style="color:${low ? '#b8322f' : '#2a1a14'}">${G.fuel.toFixed(1)}/${fc} t</span>`; }
   $('#dayChip').innerHTML = `Day ${Math.floor(G.day)} · ${clockText()} <span style="color:${cond < 40 ? '#b8322f' : cond < 70 ? '#c98f1a' : '#3f8a3e'}">♥${cond}%</span>`;
+  const pb = $('#pauseBtn'); pb.hidden = !G.trip; pb.classList.toggle('on', !!G.paused); pb.textContent = G.paused ? '▶' : '❚❚';
+  $('#pausedBanner').hidden = !(G.trip && G.paused);
   // which buttons work right now
   const away = !!G.trip;
   for (const b of document.querySelectorAll('.tb')){
@@ -1412,6 +1422,7 @@ function refreshHud(){
   }
 }
 let newsTimer = 0;
+$('#pauseBtn').addEventListener('click', () => { if (!G || !G.trip) return; G.paused = !G.paused; save(); refreshHud(); });
 function showNews(txt){ const n = $('#news'); n.innerHTML = `<b>NEWS:</b> ${esc(txt)}`; n.style.opacity = 1; newsTimer = 9; }
 function toast(txt, cls = ''){ const d = document.createElement('div'); d.className = 'toast ' + cls; d.textContent = txt; $('#toasts').appendChild(d); setTimeout(() => d.remove(), 3200); }
 
@@ -1457,7 +1468,8 @@ const PANELS = {
   },
   pax(){
     const seats = seatsOf(), rich = richOf();
-    const onboard = G.pax.length ? G.pax.map(p => `<div class="card row"><span class="grow">${p.n} × ${p.cls === 'rich' ? '<b>Rich</b>' : 'Regular'} to <b>${TOWN[p.to].n}</b></span><span class="num">${fmt(p.fare * p.n)}</span></div>`).join('') : '<div class="muted">Nobody aboard.</div>';
+    const onboard = G.pax.length ? G.pax.map(p => { const cost = p.n * (p.cls === 'rich' ? 50 : 25);
+      return `<div class="card row"><span class="grow">${p.n} × ${p.cls === 'rich' ? '<b>Rich</b>' : 'Regular'} to <b>${TOWN[p.to].n}</b> <span class="small muted">· ${awayText(p.to)}</span></span><span class="num">${fmt(p.fare * p.n)}</span><button class="btn bad" data-a="kick:${p.id}" ${G.money < cost ? 'disabled' : ''}>Kick off -${fmt(cost)}</button></div>`; }).join('') : '<div class="muted">Nobody aboard.</div>';
     let waiting = '';
     if (!G.trip){
       const o = G.offers[G.town];
@@ -1593,6 +1605,8 @@ $('#panel').addEventListener('click', e => {
       if (tons > 0 && G.money >= Math.ceil(tons * fp)){ G.money -= Math.ceil(tons * fp); G.fuel = Math.min(fuelCap(), G.fuel + tons); G.mk[t].coal.press = clamp(G.mk[t].coal.press - .01 * tons, -.6, .75); toast(`Loaded ${tons.toFixed(1)} t of coal`, 'g'); } break; }
     case 'reserve': { const T = G.trip; if (!T || T.reserved) break; const g = T.board.find(q => q.id === +x); if (!g || !fitsOnArrival(g)) break;
       T.board.splice(T.board.indexOf(g), 1); T.reserved = g; toast(`Reserved ${g.n} to ${TOWN[g.to].n}. No changes now!`, 'g'); break; }
+    case 'kick': { const k = G.pax.find(q => q.id === +x); if (!k) break; const cost = k.n * (k.cls === 'rich' ? 50 : 25); if (G.money < cost) break;
+      G.money -= cost; G.pax.splice(G.pax.indexOf(k), 1); toast(`${k.n} passenger${k.n > 1 ? 's' : ''} kicked off. Refunded ${fmt(cost)}`, 'r'); break; }
     case 'repair': { const cost = Math.ceil((100 - G.train.cond) * 3.2); if (G.money >= cost){ G.money -= cost; G.train.cond = 100; toast('Good as new!', 'g'); } break; }
     case 'buycar': { const c = CARS[x]; if (G.money >= c.price && G.train.cars.length < loco().cars){ G.money -= c.price; if (x === 'tender') G.train.cars.unshift(x); else G.train.cars.push(x); toast(`${c.n} coupled on!`, 'g'); if (V.stationTown) V.placeStation(); } break; }
     case 'sellcar': { const i = +x, c = G.train.cars[i];
@@ -1753,8 +1767,8 @@ function drawRequestBubble(x, y){
 // who might want something: a car with people in it
 function riderCars(){ const out = []; G.train.cars.forEach((c, i) => { if (c === 'coach' && paxUsed('std') > G.train.cars.slice(0, i).filter(q => q === 'coach').length * 10) out.push(i); if (c === 'luxury' && paxUsed('rich') > G.train.cars.slice(0, i).filter(q => q === 'luxury').length * 6) out.push(i); }); return out; }
 function requestTick(dt){
-  if (V.req){ V.req.life -= dt; if (V.req.life <= 0 || V.decel || !G.trip){ if (V.req.life <= 0) toast('The passenger gave up waiting.'); V.req = null; } return; }
-  if (!G.trip || paused || V.decel || !$('#modal').hidden) return;
+  if (V.req){ if (!G.paused) V.req.life -= dt; if (V.req.life <= 0 || V.decel || !G.trip){ if (V.req.life <= 0) toast('The passenger gave up waiting.'); V.req = null; } return; }
+  if (!G.trip || paused || G.paused || V.decel || !$('#modal').hidden) return;
   const cars = riderCars(); if (!cars.length) return;
   V.reqT = (V.reqT == null ? 8 : V.reqT) - dt;
   if (V.reqT > 0) return;
@@ -1928,7 +1942,7 @@ function fitsOnArrival(g){
   return (g.cls === 'rich' ? richOf() : seatsOf()) - stay >= g.n;
 }
 function boardTick(dt){
-  const T = G.trip; if (!T || paused) return;
+  const T = G.trip; if (!T || paused || G.paused) return;
   if (!T.board){ T.board = []; T.boardT = 0; }
   for (const g of T.board) g.life -= dt;
   T.board = T.board.filter(g => g.life > 0);
@@ -1980,7 +1994,7 @@ function boot(){
   } else newGame();
   resize(); buildSprites();
   if (G.town){ V.arrive(G.town); }
-  else { V.v = CRUISE; setBiome(sceneryAt(G.trip)); V.fade = 1; }
+  else { V.v = G.paused ? 0 : CRUISE; setBiome(sceneryAt(G.trip)); V.fade = 1; }
   dispMoney = G.money;
   refreshHud();
   showNews(G.news[0].txt);
