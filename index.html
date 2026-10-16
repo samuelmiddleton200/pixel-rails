@@ -168,7 +168,10 @@ table.mk img{width:22px;height:22px;vertical-align:middle}
 .mapwrap{display:flex;gap:10px;height:100%}
 .mapbox{position:relative;flex:1.4;min-height:180px;border:2px solid var(--ink);border-radius:8px;overflow:hidden;background:#cdb886}
 .mapbox canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
-.mapbox .lbl{position:absolute;transform:translate(-50%,0);font:700 11px var(--body);background:rgba(244,228,193,.92);border:1.5px solid var(--ink);border-radius:4px;padding:0 4px;white-space:nowrap;pointer-events:none}
+.mapbox .lbl{position:absolute;transform:translate(-50%,7px);font:700 10px var(--body);background:rgba(244,228,193,.92);border:1.5px solid var(--ink);border-radius:4px;padding:0 4px;white-space:nowrap;pointer-events:none}
+.mapbox .lbl[data-side=t]{transform:translate(-50%,calc(-100% - 7px))}
+.mapbox .lbl[data-side=l]{transform:translate(calc(-100% - 7px),-50%)}
+.mapbox .lbl[data-side=r]{transform:translate(7px,-50%)}
 .mapbox .lbl.here{background:#ffd166}
 .mapbox .lbl.sel{background:#8fd16a}
 .mapinfo{flex:1;overflow-y:auto;min-width:0}
@@ -244,22 +247,37 @@ const GOODS = [
 const CONTRA = { id:'moon', n:'Moonshine', base:95, col:'#9fd8e8', hi:'#e2f6fb' };   // illegal
 const GOOD = Object.fromEntries([...GOODS, CONTRA].map(g => [g.id, g]));
 
-// map is 100 x 62; biomes pick the scenery; law = chance an inspector checks your cargo
+// map is the lower 48: x = (lon + 125) / 59 * 100, y = (49.5 - lat) / 25 * 62. law = chance an inspector checks your cargo
+// lbl = which side of the dot the name sits on the map (keeps the crowded east coast readable)
+const START = 'kans';
 const TOWNS = [
-  { id:'fair', n:'Fairhaven',     x:30, y:36, biome:'plains', prod:['grain','cattle'],   size:3, law:.35, bank:1, shop:1, roof:'#b8322f' },
-  { id:'cott', n:'Cotton Bend',   x:46, y:46, biome:'plains', prod:['cotton','grain'],   size:2, law:.25, roof:'#3f7fb8' },
-  { id:'sunv', n:'Sunvale',       x:63, y:54, biome:'coast',  prod:['oranges'],          size:2, law:.25, roof:'#e08a2e' },
-  { id:'port', n:'Port Bell',     x:84, y:45, biome:'coast',  prod:['luxury','whiskey'], size:3, law:.45, bank:1, shop:1, roof:'#2f6d8a' },
-  { id:'gran', n:'Grand Central', x:62, y:31, biome:'city',   prod:['luxury'],           size:3, law:.6,  bank:1, shop:1, roof:'#6a4a8a' },
-  { id:'pine', n:'Pine Hollow',   x:20, y:17, biome:'forest', prod:['lumber'],           size:1, law:.15, roof:'#4a7a3a' },
-  { id:'iron', n:'Ironvale',      x:41, y:13, biome:'forest', prod:['iron','coal'],      size:2, law:.3,  shop:1, roof:'#5a5a6a' },
-  { id:'fros', n:'Frostpeak',     x:58, y:7,  biome:'snow',   prod:['coal','lumber'],    size:1, law:.15, roof:'#a8322e' },
-  { id:'silv', n:'Silver Creek',  x:80, y:14, biome:'snow',   prod:['gold'],             size:2, law:.2,  roof:'#2e4a73' },
-  { id:'mesa', n:'Red Mesa',      x:11, y:49, biome:'desert', prod:['cattle','whiskey'], size:1, law:0,   shady:1, roof:'#c0563a' },
+  { id:'seat', n:'Seattle',       x:4.5,  y:4.7,  biome:'forest', prod:['lumber','coal'],    size:2, law:.3,  shop:1, roof:'#2f6d4a', lbl:'r' },
+  { id:'sanf', n:'San Francisco', x:4.4,  y:29.1, biome:'coast',  prod:['gold','luxury'],    size:3, law:.5,  bank:1, shop:1, roof:'#b8322f', lbl:'r' },
+  { id:'vega', n:'Las Vegas',     x:16.7, y:33.1, biome:'desert', prod:['whiskey'],          size:1, law:0,   shady:1, roof:'#c0563a', lbl:'r' },
+  { id:'phoe', n:'Phoenix',       x:21.9, y:39.8, biome:'desert', prod:['oranges','cotton'], size:1, law:.2,  roof:'#e08a2e', lbl:'b' },
+  { id:'albu', n:'Albuquerque',   x:31.1, y:35.8, biome:'desert', prod:['cattle','gold'],    size:1, law:.15, roof:'#b5651d', lbl:'b' },
+  { id:'denv', n:'Denver',        x:33.9, y:24.2, biome:'snow',   prod:['gold','coal'],      size:2, law:.3,  bank:1, roof:'#2e4a73', lbl:'t' },
+  { id:'kans', n:'Kansas City',   x:51.6, y:25.8, biome:'plains', prod:['cattle','grain'],   size:3, law:.35, bank:1, shop:1, roof:'#b8322f', lbl:'b' },
+  { id:'fort', n:'Fort Worth',    x:46.9, y:41.5, biome:'desert', prod:['cattle','cotton'],  size:2, law:.25, roof:'#a8322e', lbl:'b' },
+  { id:'minn', n:'Minneapolis',   x:53.8, y:11.2, biome:'snow',   prod:['grain','lumber'],   size:2, law:.25, roof:'#3f7fb8', lbl:'t' },
+  { id:'detr', n:'Detroit',       x:71.1, y:17.8, biome:'forest', prod:['iron','lumber'],    size:2, law:.35, shop:1, roof:'#5a5a6a', lbl:'t' },
+  { id:'cinc', n:'Cincinnati',    x:68.6, y:25.8, biome:'plains', prod:['grain','iron'],     size:2, law:.3,  roof:'#6a8a3a', lbl:'b' },
+  { id:'pitt', n:'Pittsburgh',    x:76.3, y:22.5, biome:'forest', prod:['iron','coal'],      size:3, law:.4,  shop:1, roof:'#3a3a4a', lbl:'b' },
+  { id:'phil', n:'Philadelphia',  x:84.5, y:23.7, biome:'city',   prod:['luxury','grain'],   size:3, law:.55, bank:1, roof:'#8a3a2a', lbl:'r' },
+  { id:'nyc',  n:'New York',      x:86.4, y:21.8, biome:'city',   prod:['luxury','whiskey'], size:3, law:.7,  bank:1, shop:1, roof:'#6a4a8a', lbl:'t' },
+  { id:'bost', n:'Boston',        x:91.4, y:17.7, biome:'coast',  prod:['lumber','cotton'],  size:3, law:.55, bank:1, roof:'#2f4a73', lbl:'t' },
+  { id:'nash', n:'Nashville',     x:64.8, y:33.1, biome:'plains', prod:['whiskey','cattle'], size:2, law:.3,  roof:'#b5651d', lbl:'l' },
+  { id:'char', n:'Charlotte',     x:74.8, y:35.4, biome:'forest', prod:['lumber','cotton'],  size:2, law:.3,  roof:'#4a7a3a', lbl:'r' },
+  { id:'atla', n:'Atlanta',       x:68.8, y:39.1, biome:'city',   prod:['cotton','whiskey'], size:3, law:.45, bank:1, shop:1, roof:'#a8322e', lbl:'l' },
+  { id:'sava', n:'Savannah',      x:74.4, y:43.2, biome:'coast',  prod:['cotton','lumber'],  size:2, law:.25, roof:'#3f7fb8', lbl:'r' },
+  { id:'jack', n:'Jacksonville',  x:73.5, y:47.5, biome:'coast',  prod:['oranges','lumber'], size:2, law:.3,  roof:'#e08a2e', lbl:'b' },
 ];
 const TOWN = Object.fromEntries(TOWNS.map(t => [t.id, t]));
-const EDGES = [['fair','cott'],['cott','sunv'],['sunv','port'],['port','gran'],['gran','cott'],['gran','fair'],['fair','pine'],
-  ['pine','iron'],['iron','fros'],['fros','silv'],['silv','gran'],['iron','gran'],['fair','mesa'],['mesa','cott'],['silv','port']];
+// every city links to the cities near it, and no two lines of track cross
+const EDGES = [['phil','nyc'],['jack','sava'],['nyc','bost'],['sava','atla'],['pitt','detr'],['atla','char'],['atla','nash'],['sava','char'],['nash','cinc'],
+  ['pitt','phil'],['cinc','pitt'],['cinc','detr'],['phoe','vega'],['jack','atla'],['phoe','albu'],['nash','char'],['cinc','char'],['denv','albu'],['vega','sanf'],
+  ['pitt','char'],['vega','albu'],['minn','kans'],['nash','kans'],['phil','char'],['kans','fort'],['fort','albu'],['cinc','kans'],['denv','kans'],['detr','minn'],
+  ['denv','vega'],['sanf','seat']];
 const ADJ = {}; TOWNS.forEach(t => ADJ[t.id] = []);
 const dist = (a, b) => Math.hypot(TOWN[a].x - TOWN[b].x, TOWN[a].y - TOWN[b].y);
 EDGES.forEach(([a, b]) => { const d = dist(a, b); ADJ[a].push([b, d]); ADJ[b].push([a, d]); });
@@ -274,7 +292,7 @@ function route(from, to){                                  // dijkstra over the 
   const path = [to]; while (path[0] !== from) path.unshift(P[path[0]]);
   return { path, d:D[to] };
 }
-const SEG_LEN = 9;                                          // map units per segment
+const SEG_LEN = 6;                                          // map units per segment
 const segsFor = d => Math.max(2, Math.round(d / SEG_LEN));
 
 const LOCOS = [
@@ -308,13 +326,13 @@ const BIZ = {   // investment kinds; a town gets the ones that fit what it makes
 // =====================================================================================
 //  game state
 // =====================================================================================
-const SAVE_KEY = 'pixelrails.v1';
+const SAVE_KEY = 'pixelrails.v2';
 let G = null;
 
 function newGame(){
   const seed = Math.floor(Math.random() * 1e9);
   R = mulberry(seed);
-  G = { v:1, seed, money:600, day:1, tod:.1, town:'fair', trip:null, cargo:{}, paid:{}, pax:[], contracts:[],
+  G = { v:2, seed, money:600, day:1, tod:.1, town:START, trip:null, cargo:{}, paid:{}, pax:[], contracts:[],
     train:{ loco:0, cars:['freight','coach'], cond:100 }, crew:[], loan:0, shares:{}, events:[], news:[], mk:{}, offers:{},
     seen:{}, biz:{}, wageDays:0, freeCoal:0, wall:Date.now(), stats:{ trips:0, earned:0, best:0 }, cid:1, nextNewsDay:2 };
   // markets: every world rolls its own prices, so nobody knows the best route ahead of time
@@ -334,11 +352,11 @@ function newGame(){
   TOWNS.forEach(t => refreshOffers(t.id, true));
   R = Math.random;
   G.news.unshift({ day:1, txt:'Welcome to the rails! Buy low where goods are made, sell high where they are wanted.' });
-  noteSeen('fair');
+  noteSeen(START);
 }
 
 function save(){ if (!G) return; G.wall = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) {} }
-function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && g.v === 1) return g; } } catch (e) {} return null; }
+function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && g.v === 2) return g; } } catch (e) {} return null; }
 
 // ---- prices ----
 function price(town, g){
@@ -1191,7 +1209,7 @@ const PANELS = {
           return `<tr><td>${gImg(g.id)} ${g.n}</td><td class="r num">${fmt(b)}</td><td class="r num">${fmt(s)}</td><td class="r small">${hint}</td></tr>`; }).join('') + '</table>';
       }
       let go = '';
-      if (G.town){ const p = tripPreview(sel); go = `<div class="card hl"><div>${p.segs} segments · ~${p.secs}s · ${p.days} days</div><div class="small muted">Coal ${G.freeCoal ? 'partly free' : fmt(p.coal)}${p.path.length > 2 ? ' · via ' + p.path.slice(1, -1).map(x => TOWN[x].n).join(', ') : ''}</div><button class="btn go big" data-a="go:${sel}" style="margin-top:6px;width:100%">All aboard! → ${t.n}</button></div>`; }
+      if (G.town){ const p = tripPreview(sel); go = `<div class="card hl"><div>${p.segs} segments · ~${p.secs}s · ${p.days} day${p.days === 1 ? "" : "s"}</div><div class="small muted">Coal ${G.freeCoal ? 'partly free' : fmt(p.coal)}${p.path.length > 2 ? ' · via ' + p.path.slice(1, -1).map(x => TOWN[x].n).join(', ') : ''}</div><button class="btn go big" data-a="go:${sel}" style="margin-top:6px;width:100%">All aboard! → ${t.n}</button></div>`; }
       info = `<h3 style="margin:0">${t.n}</h3><div class="small muted">${t.biome[0].toUpperCase() + t.biome.slice(1)} · ${['', 'small', 'medium', 'big'][t.size]} town${t.bank ? ' · bank' : ''}${t.shop ? ' · train yard' : ''}${t.shady ? ' · <span class="dn">lawless</span>' : ''}</div>
         <div style="margin:4px 0">Makes: ${t.prod.map(g => gImg(g)).join(' ')} &nbsp; Wants: ${wants}</div>${go}${pr}`;
     } else if (G.trip) info = `<div class="card">Heading to <b>${TOWN[G.trip.to].n}</b>. Segment ${G.trip.seg + 1} of ${G.trip.segs}.</div>`;
@@ -1201,7 +1219,7 @@ const PANELS = {
     const L = loco(), tab = tabs.train;
     const carsList = G.train.cars.map((c, i) => `<div class="card row"><span class="grow"><b>${CARS[c].n}</b><div class="small muted">${CARS[c].desc}</div></span>${G.town && TOWN[G.town].shop ? `<button class="btn bad" data-a="sellcar:${i}">Sell ${fmt(CARS[c].price * .5)}</button>` : ''}</div>`).join('');
     const shop = G.town && TOWN[G.town].shop;
-    const buy = shop ? Object.entries(CARS).map(([k, c]) => `<div class="card row"><span class="grow"><b>${c.n}</b><div class="small muted">${c.desc}</div></span><button class="btn go" data-a="buycar:${k}" ${G.money < c.price || G.train.cars.length >= L.cars ? 'disabled' : ''}>${fmt(c.price)}</button></div>`).join('') : '<div class="muted">Buy cars and engines at a town with a train yard (Fairhaven, Ironvale, Grand Central, Port Bell).</div>';
+    const buy = shop ? Object.entries(CARS).map(([k, c]) => `<div class="card row"><span class="grow"><b>${c.n}</b><div class="small muted">${c.desc}</div></span><button class="btn go" data-a="buycar:${k}" ${G.money < c.price || G.train.cars.length >= L.cars ? 'disabled' : ''}>${fmt(c.price)}</button></div>`).join('') : `<div class="muted">Buy cars and engines at a town with a train yard (${TOWNS.filter(x => x.shop).map(x => x.n).join(', ')}).</div>`;
     const next = LOCOS[G.train.loco + 1];
     const cost = Math.ceil((100 - G.train.cond) * 3.2);
     return panelShell('Train', `${L.n} · ${G.train.cars.length}/${L.cars} cars`, `
@@ -1240,7 +1258,7 @@ const PANELS = {
       const bank = G.town && TOWN[G.town].bank;
       body = `<div class="card"><b>Loan: ${fmt(G.loan)}</b> <span class="small muted">2.5% interest added every day</span>
         ${bank ? `<div class="row" style="margin-top:6px;flex-wrap:wrap">${[250, 1000, 3000].map(v => `<button class="btn" data-a="borrow:${v}" ${v > limit ? 'disabled' : ''}>Borrow ${fmt(v)}</button>`).join('')}
-          <button class="btn go" data-a="repay" ${!G.loan || G.money < 1 ? 'disabled' : ''}>Repay ${fmt(Math.min(G.loan, Math.max(0, G.money)))}</button></div><div class="small muted">You can borrow ${fmt(limit)} more.</div>` : '<div class="small muted" style="margin-top:4px">Banks are in Fairhaven, Grand Central and Port Bell.</div>'}</div>
+          <button class="btn go" data-a="repay" ${!G.loan || G.money < 1 ? 'disabled' : ''}>Repay ${fmt(Math.min(G.loan, Math.max(0, G.money)))}</button></div><div class="small muted">You can borrow ${fmt(limit)} more.</div>` : `<div class="small muted" style="margin-top:4px">Banks are in ${TOWNS.filter(x => x.bank).map(x => x.n).join(', ')}.</div>`}</div>
         <div class="card small">Net worth: <b>${fmt(netWorth())}</b> · Most money held: ${fmt(G.stats.best)} · Trips: ${G.stats.trips}</div>`;
     } else body = newsList(25);
     return panelShell('Bank', G.town && TOWN[G.town].bank ? TOWN[G.town].n + ' Bank' : '', head + body);
@@ -1295,6 +1313,21 @@ $('#panel').addEventListener('click', e => {
 });
 
 // ---- the map ----
+// lower 48 outline and the Great Lakes, as [lon, lat]
+const US = [[-124.7,48.4],[-123,49],[-95.2,49],[-95.2,49.4],[-94.8,48.7],[-89.6,48],[-84.8,46.5],[-84.4,45.9],[-83.5,46],[-82.5,45.3],[-82.4,43],[-83.1,42],[-79,42.9],
+  [-79.2,43.4],[-76.3,43.6],[-75,44.9],[-71.5,45],[-70.6,45.5],[-69.2,47.4],[-67.8,47.1],[-67.8,45.7],[-67,44.8],[-68.8,44.3],[-70.2,43.6],[-70.8,42.9],[-70.6,42.6],
+  [-71,42.3],[-70,41.8],[-70,41.6],[-71.4,41.4],[-72.9,41.2],[-74,40.6],[-74.2,39.6],[-74.9,38.9],[-75.5,38.4],[-76,37.3],[-75.7,36],[-75.6,35.2],[-76.5,34.7],
+  [-78,33.9],[-79.2,33.2],[-79.9,32.7],[-81,31.8],[-81.4,30.7],[-81.3,29.8],[-80.6,28.4],[-80.1,26.8],[-80.4,25.2],[-81.1,25.1],[-81.8,26.4],[-82.7,27.7],
+  [-82.6,28.8],[-83.6,29.8],[-84.4,30],[-85.4,29.7],[-86.5,30.4],[-88.5,30.4],[-89.6,30.2],[-89.2,29.2],[-90.5,29.1],[-91.6,29.6],[-93.8,29.7],[-95,29.2],
+  [-97.2,27.6],[-97.4,25.9],[-99.1,26.4],[-100.3,28.2],[-101.4,29.8],[-102.5,29.8],[-103.2,29],[-104.5,29.6],[-106.5,31.8],[-108.2,31.8],[-108.2,31.3],[-111.1,31.3],
+  [-114.8,32.5],[-117.1,32.5],[-118.4,33.9],[-120.6,34.6],[-121.9,36.6],[-122.5,37.8],[-123,38.3],[-123.8,39.8],[-124.2,41.8],[-124.5,43],[-124,46.3],[-124.7,48.4]];
+const LAKES = [
+  [[-92.1,46.7],[-90.4,46.6],[-88.4,47.4],[-86.5,46.5],[-84.6,46.5],[-85,47],[-87.3,47.9],[-89.6,48],[-91,47.3]],
+  [[-87.8,42.1],[-87.1,41.6],[-86.4,42.4],[-86.2,43.7],[-85.6,45.2],[-84.8,45.8],[-86.2,45.9],[-87.6,44.9],[-87.9,43.4]],
+  [[-84.7,45.8],[-83.4,45.3],[-82.5,43.4],[-81.8,43.6],[-81.7,45],[-80.4,45.6],[-81.8,46.1],[-84,46]],
+  [[-83.4,41.7],[-82,42.3],[-79.8,42.8],[-78.9,42.9],[-79.8,42.3],[-81.5,41.6],[-82.7,41.4]],
+  [[-79.8,43.3],[-78,43.4],[-76.3,43.6],[-76.6,44.1],[-78.4,43.9],[-79.6,43.7]],
+];
 function drawMap(){
   const box = $('#mapbox'), c = $('#mapcv'); if (!box || !c) return;
   const w = box.clientWidth, h = box.clientHeight, dpr = Math.min(devicePixelRatio || 1, 3);
@@ -1303,10 +1336,14 @@ function drawMap(){
   const g = c.getContext('2d'), W = c.width, H = c.height;
   const X = t => Math.round(8 + TOWN[t].x / 100 * (W - 16)), Y = t => Math.round(6 + TOWN[t].y / 62 * (H - 14));
   // land
+  // sea, then the lower 48 (same projection as the towns), then the Great Lakes
   P(g, '#8fc0d8', 0, 0, W, H);
-  g.fillStyle = '#d9c48e'; g.beginPath(); g.ellipse(W / 2, H / 2, W * .52, H * .55, 0, 0, Math.PI * 2); g.fill();
-  P(g, '#8fc0d8', Math.round(W * .66), Math.round(H * .78), W, H);
-  for (let i = 0; i < 120; i++) P(g, '#cbb57e', hash(i * 3) * W | 0, hash(i * 5) * H | 0, 2, 1);
+  for (let i = 0; i < 90; i++) P(g, '#a6cfe2', hash(i * 11) * W | 0, hash(i * 19) * H | 0, 3, 1);
+  const LX = lon => 8 + (lon + 125) / 59 * (W - 16), LY = lat => 6 + (49.5 - lat) / 25 * (H - 14);
+  const poly = (pts, col, dy = 0) => { g.fillStyle = col; g.beginPath(); pts.forEach(([lo, la], i) => i ? g.lineTo(LX(lo), LY(la) + dy) : g.moveTo(LX(lo), LY(la) + dy)); g.closePath(); g.fill(); };
+  poly(US, '#8a6a42', 1); poly(US, '#d9c48e');
+  for (const L of LAKES) poly(L, '#8fc0d8');
+  for (let i = 0; i < 160; i++){ const x = hash(i * 3) * W | 0, y = hash(i * 5) * H | 0; if (g.getImageData(x, y, 1, 1).data[0] > 200) P(g, '#cbb57e', x, y, 2, 1); }
   // biome blobs
   for (const t of TOWNS){ const col = { plains:'#a9c47a', forest:'#6f9a5a', snow:'#eef2f8', desert:'#e6b47a', coast:'#e8d6a0', city:'#b4b0b8' }[t.biome]; g.fillStyle = col; g.beginPath(); g.ellipse(X(t.id), Y(t.id), 10, 7, 0, 0, Math.PI * 2); g.fill(); }
   // rails
@@ -1329,7 +1366,7 @@ function drawMap(){
   box.querySelectorAll('.lbl').forEach(l => l.remove());
   for (const t of TOWNS){
     const l = document.createElement('div'); l.className = 'lbl' + (t.id === G.town ? ' here' : t.id === tabs.map ? ' sel' : '');
-    l.textContent = t.n; l.style.left = (X(t.id) * S / dpr) + 'px'; l.style.top = (Y(t.id) * S / dpr + 8) + 'px'; box.appendChild(l);
+    l.textContent = t.n; l.dataset.side = t.lbl || 'b'; l.style.left = (X(t.id) * S / dpr) + 'px'; l.style.top = (Y(t.id) * S / dpr) + 'px'; box.appendChild(l);
   }
   c.onclick = e => {
     const rct = c.getBoundingClientRect(), mx = (e.clientX - rct.left) / rct.width * W, my = (e.clientY - rct.top) / rct.height * H;
