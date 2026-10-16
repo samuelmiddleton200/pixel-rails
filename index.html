@@ -1373,6 +1373,7 @@ function drawTrain(night){
   let x = lx;
   // cars (behind the loco, to the left)
   const order = G.train.cars;
+  V.glows = [];
   for (let i = 0; i < order.length; i++){
     const type = order[i], sp = (night > .5 ? sprites.carsN : sprites.cars)[type];
     x -= CAR_W + 3;
@@ -1382,11 +1383,15 @@ function drawTrain(night){
     bx.drawImage(sp, x, y);
     for (const wx of [10, 19, 40, 49]) wheel(x + wx, base - 3, 3, (V.x / 3) + wx);
     if (['coach', 'luxury'].includes(type)) drawRiders(type, x, y, i);
+    if (type === 'luxury') for (let k = 0; k < 4; k++) V.glows.push([x + 7 + k * 14, y + 11, 7, 9]);
+    else if (type === 'coach' || type === 'dining') for (let k = 0; k < 5; k++) V.glows.push([x + 5 + k * 11, y + 11, 7, 9]);
     if (V.req && V.req.car === i && G.trip) drawRequestBubble(x, y);
   }
   // loco
   const ly = base - L.height - 4 + bob;
   bx.drawImage(L, lx, ly);
+  V.glows.push([lx + 9, ly + 13, 9, 7]);
+  V.lamp = [lx + 1 + 69, ly + 1 + 10];          // the bulb on the front of the lamp housing
   const ang = V.x / 6;
   wheel(lx + 13, base - 3, 3, ang); wheel(lx + 63, base - 3, 3, ang);
   wheel(lx + 32, base - 6, 6, ang); wheel(lx + 47, base - 6, 6, ang);
@@ -1395,21 +1400,127 @@ function drawTrain(night){
   bx.fillStyle = '#c9ccd4'; const a1 = lx + 32 + rx, a2 = lx + 47 + rx, yy = Math.round(base - 6 + ry);
   bx.fillRect(Math.round(a1), yy, Math.round(a2 - a1) + 1, 2); bx.fillStyle = '#8a8f99'; bx.fillRect(Math.round(a1), yy + 1, Math.round(a2 - a1) + 1, 1);
 }
+// cargo you can see: 1-3 crates sit below the walls, 4-7 peek over the edge, 8-10 heap the car full.
+// a car with mixed goods splits its width between them. each look is drawn once, outlined like every other sprite, and cached.
+const CARGO_CACHE = new Map(), LOAD_H = 20, LOAD_RIM = 16;             // the load canvas: the car's rim sits on row 16
 function drawCargo(x, y, idx){
-  // cargo heaps show what you are carrying, spread over the freight cars
   const freightIdx = G.train.cars.slice(0, idx).filter(c => c === 'freight').length;
-  const goods = Object.entries(G.cargo).filter(([g, q]) => q > 0 && g !== 'moon');
-  let units = []; for (const [g, q] of goods) for (let i = 0; i < q; i++) units.push(g);
-  const mine = units.slice(freightIdx * 10, freightIdx * 10 + 10);
-  if (!mine.length) return;
-  for (let i = 0; i < mine.length; i++){
-    const gd = GOOD[mine[i]], cx = x + 6 + i * 5;
-    const hgt = 3 + ((i * 7) % 3);
-    bx.fillStyle = '#24150f'; bx.fillRect(cx - 1, y + 13 - hgt - 1, 7, hgt + 2);
-    bx.fillStyle = gd.col; bx.fillRect(cx, y + 13 - hgt, 5, hgt + 1);
-    bx.fillStyle = gd.hi; bx.fillRect(cx + 1, y + 13 - hgt, 2, 1);
+  const units = []; for (const [g, q] of Object.entries(G.cargo)) if (q > 0 && g !== 'moon') for (let i = 0; i < q; i++) units.push(g);
+  const mine = units.slice(freightIdx * 10, freightIdx * 10 + 10), n = mine.length;
+  if (n < 4) return;
+  const full = n >= 8, groups = [];
+  for (const g of mine){ const last = groups[groups.length - 1]; if (last && last.g === g) last.n++; else groups.push({ g, n:1 }); }
+  const frame = groups.some(gr => gr.g === 'cattle') ? Math.floor(performance.now() / 700) % 2 : 0;
+  const key = groups.map(gr => gr.g + gr.n).join() + (full ? 'F' : 'p') + frame + freightIdx;
+  let img = CARGO_CACHE.get(key);
+  if (!img){
+    if (CARGO_CACHE.size > 60) CARGO_CACHE.clear();
+    const raw = mk(CAR_W, LOAD_H, g => {
+      let gx = 2; const inner = CAR_W - 4;
+      groups.forEach((gr, k) => { const w = k === groups.length - 1 ? CAR_W - 2 - gx : Math.round(inner * gr.n / n);
+        g.save(); g.beginPath(); g.rect(gx, 0, w, LOAD_H); g.clip(); LOADS[gr.g](g, gx, w, full, mulberry(freightIdx * 97 + k * 13 + gr.n), frame); g.restore(); gx += w; });
+    });
+    img = outlined(raw); CARGO_CACHE.set(key, img);
   }
+  bx.drawImage(img, x - 1, y + 13 - LOAD_RIM - 1);
+  // gold ore keeps twinkling on top of the cached heap
+  let gx = x + 2;
+  for (const gr of groups){ const w = Math.round((CAR_W - 4) * gr.n / n);
+    if (gr.g === 'gold') for (let k = 0; k < 3; k++){ const ph = performance.now() / 600 + k * 2.1; if (Math.sin(ph) > .6){ const sx = gx + 3 + Math.round(hash(k * 7 + freightIdx) * (w - 6)), sy = y + 13 - (full ? 5 : 2) - Math.round(hash(k + 3) * 2); P(bx, '#fffbe0', sx, sy, 1, 1); P(bx, 'rgba(255,240,170,.8)', sx - 1, sy, 3, 1); P(bx, 'rgba(255,240,170,.8)', sx, sy - 1, 1, 3); } }
+    gx += w; }
 }
+// height of a heap at column xx of a w-wide group (bumpy, highest in the middle)
+const heapTop = (xx, w, H, r) => Math.round(LOAD_RIM - H * (1 - .5 * ((xx - w / 2) / (w / 2)) ** 2) - (r() < .3 ? 1 : 0));
+const LOADS = {
+  coal(g, x0, w, full, r){
+    const H = full ? 7 : 3;
+    for (let xx = 0; xx < w; xx++){ const top = heapTop(xx, w, H, r); P(g, '#2a2a30', x0 + xx, top, 1, LOAD_H - top); }
+    for (let i = 0; i < w * (full ? 1.6 : .8); i++){ const xx = Math.floor(r() * (w - 2)), top = heapTop(xx, w, H, r) + Math.floor(r() * (H + 1));      // lumps catching the light
+      P(g, '#3e3e46', x0 + xx, top, 2, 2); P(g, '#6a6a76', x0 + xx, top, 1, 1); }
+  },
+  grain(g, x0, w, full, r){
+    const H = full ? 7 : 3;
+    for (let xx = 0; xx < w; xx++){ const top = heapTop(xx, w, H, r); P(g, '#d8ad3e', x0 + xx, top, 1, LOAD_H - top); P(g, '#f3d77a', x0 + xx, top, 1, 1); }
+    for (let i = 0; i < w * 2; i++){ const xx = Math.floor(r() * w), yy = LOAD_RIM - Math.floor(r() * H); P(g, r() < .5 ? '#b8892a' : '#f6e08e', x0 + xx, yy, 1, 1); }
+    if (full) for (let xx = 3; xx < w - 3; xx += 7) P(g, '#c99a2a', x0 + xx, heapTop(xx, w, H, r) + 2, 2, 1);       // little ridges
+  },
+  gold(g, x0, w, full, r){
+    const H = full ? 7 : 3;
+    for (let xx = 0; xx < w; xx++){ const top = heapTop(xx, w, H, r); P(g, '#6e6458', x0 + xx, top, 1, LOAD_H - top); P(g, '#958a7c', x0 + xx, top, 1, 1); }
+    for (let i = 0; i < w * 1.2; i++){ const xx = Math.floor(r() * (w - 2)), top = heapTop(xx, w, H, r) + 1 + Math.floor(r() * H);
+      if (r() < .35){ P(g, '#c9921a', x0 + xx, top, 2, 2); P(g, '#f6d04a', x0 + xx, top, 1, 1); } else { P(g, '#584e44', x0 + xx, top, 2, 1); P(g, '#a89c8c', x0 + xx, top, 1, 1); } }
+  },
+  oranges(g, x0, w, full, r){
+    // each orange: dark rind edge, bright fill, a shine, a shaded side, sometimes a leaf
+    const ball = (X, Y) => {
+      P(g, '#a8481a', X + 1, Y, 3, 1); P(g, '#a8481a', X, Y + 1, 5, 3); P(g, '#a8481a', X + 1, Y + 4, 3, 1);
+      P(g, '#f08a24', X + 1, Y + 1, 3, 3); P(g, '#d06a1c', X + 3, Y + 2, 1, 2); P(g, '#ffc06a', X + 1, Y + 1, 1, 1);
+      if (r() < .3){ P(g, '#3f8a3e', X + 2, Y - 1, 2, 1); P(g, '#5aa848', X + 3, Y - 1, 1, 1); }
+    };
+    const rows = full ? 2 : 1;
+    for (let row = 0; row < rows; row++){
+      const inset = row * 3, Y = full ? LOAD_RIM - 4 - row * 3 : LOAD_RIM - 3;
+      for (let xx = inset + (row % 2) * 2; xx + 5 <= w - inset; xx += 4) ball(x0 + xx, Y + (r() < .25 ? 1 : 0));
+    }
+  },
+  cotton(g, x0, w, full, r){
+    const puff = (X, Y) => { P(g, '#d6cdb8', X, Y + 1, 5, 3); P(g, '#f4f1e8', X + 1, Y, 3, 3); P(g, '#f4f1e8', X, Y + 1, 2, 2); P(g, '#ffffff', X + 1, Y, 1, 1); P(g, '#8a6a4a', X + 2, Y + 3, 1, 1); };
+    const rows = full ? 3 : 1;
+    for (let row = 0; row < rows; row++){ const inset = row * 4, Y = LOAD_RIM - 3 - row * 3 + (full ? 0 : 1);
+      for (let xx = inset + (row % 2) * 2; xx + 5 <= w - inset; xx += 4) puff(x0 + xx, Y - (r() < .3 ? 1 : 0)); }
+  },
+  lumber(g, x0, w, full, r){
+    const rows = full ? 3 : 1;
+    for (let row = 0; row < rows; row++){
+      const Y = LOAD_RIM - 3 - row * 3, a = x0 + row * 2, b = x0 + w - row * 2;
+      P(g, '#6e4526', a, Y, b - a, 3); P(g, '#9b6a3c', a, Y, b - a, 2); P(g, '#c08a52', a, Y, b - a, 1);
+      for (let xx = a + 3; xx < b - 2; xx += 5 + Math.floor(r() * 4)) P(g, '#5e3a1e', xx, Y + 1, 2, 1);                // bark
+      P(g, '#e8c38a', a, Y, 2, 3); P(g, '#b88a5a', a, Y + 1, 1, 1);                                                    // cut end with a ring
+    }
+    if (full) for (const f of [.3, .7]){ const xx = x0 + Math.round(w * f); P(g, '#4a4e58', xx, LOAD_RIM - 9, 1, 10); P(g, '#9aa0ab', xx, LOAD_RIM - 9, 1, 1); }   // chain straps
+  },
+  iron(g, x0, w, full, r){
+    const rows = full ? 3 : 1;
+    // ingots stacked like bricks, each row shifted half an ingot
+    for (let row = 0; row < rows; row++){ const inset = row * 2, Y = LOAD_RIM - 3 - row * 3;
+      for (let xx = inset + (row % 2) * 4; xx + 7 <= w - inset; xx += 8){ const X = x0 + xx;
+        P(g, '#4a525c', X, Y, 7, 3); P(g, '#8d97a3', X + 1, Y, 5, 2); P(g, '#c9d0d8', X + 1, Y, 5, 1); P(g, '#eef2f6', X + 1, Y, 2, 1); } }
+  },
+  whiskey(g, x0, w, full, r){
+    const Hb = full ? 7 : 4;
+    for (let xx = 1; xx + 5 <= w; xx += 6){ const X = x0 + xx, Y = LOAD_RIM - Hb + 1;
+      P(g, '#6e3e1a', X, Y + 1, 5, Hb); P(g, '#a8662e', X + 1, Y, 3, Hb + 1); P(g, '#d09058', X + 1, Y + 1, 1, Hb - 1);        // staves
+      P(g, '#7a4a22', X + 1, Y, 3, 1);                                                                                          // lid
+      P(g, '#3a3a40', X, Y + 2, 5, 1); if (full) P(g, '#3a3a40', X, Y + 5, 5, 1);                                               // hoops
+    }
+  },
+  luxury(g, x0, w, full, r){
+    const items = [
+      (X, Y) => { P(g, '#4a2462', X, Y, 6, 5); P(g, '#7a4ea8', X + 1, Y, 4, 4); P(g, '#e8c35a', X, Y, 6, 1); P(g, '#e8c35a', X + 2, Y, 2, 5); P(g, '#fff0a8', X + 2, Y, 1, 1); },        // crate with a gold band
+      (X, Y) => { P(g, '#6a3a1a', X, Y + 1, 6, 4); P(g, '#8a5a2a', X, Y, 6, 2); P(g, '#e8c35a', X, Y + 2, 6, 1); P(g, '#f6d04a', X + 2, Y + 2, 2, 2); },                         // gilded chest
+      (X, Y) => { P(g, '#a8322e', X, Y + 2, 6, 3); P(g, '#e8b23a', X + 1, Y + 3, 1, 1); P(g, '#e8b23a', X + 4, Y + 3, 1, 1); P(g, '#d8a070', X, Y + 2, 1, 3); },                // rolled rug
+      (X, Y) => { P(g, '#2f6fb0', X + 1, Y + 1, 4, 4); P(g, '#2f6fb0', X + 2, Y - 1, 2, 2); P(g, '#e8eef7', X + 2, Y + 2, 2, 1); P(g, '#9fd3e8', X + 1, Y + 1, 1, 1); },        // vase
+    ];
+    const rows = full ? 2 : 1;
+    for (let row = 0; row < rows; row++){ const Y = LOAD_RIM - (full ? 5 : 3) - row * 5;
+      for (let xx = 1 + row * 3; xx + 6 <= w - row * 3; xx += 7) items[Math.floor(r() * 4)](x0 + xx, Y); }
+  },
+  cattle(g, x0, w, full, r, frame){
+    // little cow faces: ears out to the side, curved horns, eyes, a pink muzzle; some brown with a white blaze
+    const COWS = [['#f2efe6', '#3a2a22'], ['#8a5a3a', '#f2efe6'], ['#3a2a22', '#f2efe6'], ['#c8a070', '#f2efe6']];
+    for (let xx = 2, k = 0; xx + 7 <= w; xx += full ? 9 : 11, k++){
+      const [base, mark] = COWS[(k + Math.floor(r() * 4)) % 4], X = x0 + xx, bob = (k + frame) % 3 === 0 ? 1 : 0;
+      const Y = (full ? LOAD_RIM - 9 : LOAD_RIM - 5) + bob + (r() < .3 ? 1 : 0);
+      P(g, '#e8dcc0', X - 1, Y - 1, 1, 2); P(g, '#e8dcc0', X, Y - 2, 1, 1); P(g, '#e8dcc0', X + 6, Y - 1, 1, 2); P(g, '#e8dcc0', X + 5, Y - 2, 1, 1);   // horns
+      P(g, base, X - 2, Y + 1, 2, 2); P(g, base, X + 6, Y + 1, 2, 2); P(g, '#f0a8a0', X - 1, Y + 2, 1, 1); P(g, '#f0a8a0', X + 6, Y + 2, 1, 1);         // ears
+      P(g, base, X, Y, 6, 7); P(g, shade(base, -.15), X + 5, Y + 1, 1, 6);                                                                                  // head
+      if (base === '#f2efe6') { P(g, mark, X + 3, Y, 3, 2); P(g, mark, X, Y + 3, 1, 2); } else P(g, mark, X + 2, Y, 2, 4);                                // spots / blaze
+      P(g, '#24150f', X + 1, Y + 2, 1, 1); P(g, '#24150f', X + 4, Y + 2, 1, 1); P(g, '#ffffff', X + 1, Y + 2, 0, 0);                                        // eyes
+      P(g, '#f0a8a0', X, Y + 4, 6, 3); P(g, '#ffc8c0', X + 1, Y + 4, 4, 1); P(g, '#a85a54', X + 1, Y + 5, 1, 1); P(g, '#a85a54', X + 4, Y + 5, 1, 1);       // muzzle + nostrils
+    }
+  },
+};
+
 function wheel(cx, cy, r, ang){
   cx = Math.round(cx); cy = Math.round(cy);
   disc(bx, cx, cy, r + 1, '#24150f'); disc(bx, cx, cy, r, '#3a3d4a');
@@ -1422,15 +1533,24 @@ function drawLights(night){
   bx.globalCompositeOperation = 'lighter';
   const a = Math.min(1, (night - .3) * 1.5);
   // headlamp beam
-  const front = trainFront(), ly = trackY - 32;
-  for (let i = 0; i < 46; i++){ bx.fillStyle = `rgba(255,220,120,${a * .32 * (1 - i / 46)})`; bx.fillRect(front + i, ly - i * .25, 1, 3 + i * .5); }
+  // headlamp: a glow on the bulb, then a cone that starts right at it and fans out ahead
+  const [hx, hy] = V.lamp || [trainFront() - 11, trackY - 33];
+  bx.fillStyle = `rgba(255,236,160,${a * .5})`; bx.fillRect(hx - 1, hy - 2, 3, 4);
+  bx.fillStyle = `rgba(255,220,130,${a * .22})`; bx.fillRect(hx - 2, hy - 3, 5, 6);
+  for (let i = 1; i < 56; i++){ const spread = 1 + i * .32, fade = 1 - i / 56; bx.fillStyle = `rgba(255,222,130,${a * .3 * fade * fade})`; bx.fillRect(hx + 1 + i, Math.round(hy - spread * .35), 1, Math.round(spread) + 1); }
   // car windows
-  let x = front - sprites.loco.width;
-  bx.fillStyle = `rgba(255,190,90,${a * .35})`;
-  for (const type of G.train.cars){ x -= CAR_W + 3; if (!['freight', 'smug', 'tender'].includes(type)) bx.fillRect(x + 2, trackY - 26, CAR_W - 2, 12); }
-  bx.fillRect(front - sprites.loco.width + 6, trackY - 31, 13, 11);
+  // every lit window: a warm pane plus a soft halo, riding along with its car
+  for (const [wx, wy, ww, wh] of V.glows || []){
+    bx.fillStyle = `rgba(255,170,70,${a * .07})`; bx.fillRect(wx - 4, wy - 3, ww + 8, wh + 6);
+    bx.fillStyle = `rgba(255,185,90,${a * .14})`; bx.fillRect(wx - 2, wy - 1, ww + 4, wh + 2);
+    bx.fillStyle = `rgba(255,205,120,${a * .32})`; bx.fillRect(wx, wy, ww, wh);
+    bx.fillStyle = `rgba(255,170,70,${a * .1})`; bx.fillRect(wx - 1, trackY - 2, ww + 2, 2);      // a little light spilling on the ballast
+  }
   // station lamps
-  if (V.station !== null){ const sx = Math.round(V.station - V.x); for (const lx of [9, 141]){ bx.fillStyle = `rgba(255,210,110,${a * .4})`; disc(bx, sx + lx + 1, trackY - 30, 7, `rgba(255,210,110,${a * .25})`); } }
+  // station lamps glow from the bulb, but not through the train when it's parked in front of them
+  if (V.station !== null){ const sx = Math.round(V.station - V.x), t0 = trainFront() - trainLen(), t1 = trainFront();
+    for (const lx of [9, 141]){ const cx = sx + lx + 1, cy = trackY - 29; if (cx > t0 - 3 && cx < t1 + 3) continue;
+      disc(bx, cx, cy, 5, `rgba(255,210,110,${a * .18})`); disc(bx, cx, cy, 2, `rgba(255,230,150,${a * .35})`); } }
   bx.globalCompositeOperation = 'source-over';
 }
 function mix(a, b, t){ const A = parseInt(a.slice(1), 16), B2 = parseInt(b.slice(1), 16); const r = (A >> 16) + ((B2 >> 16) - (A >> 16)) * t, g = (A >> 8 & 255) + ((B2 >> 8 & 255) - (A >> 8 & 255)) * t, bl = (A & 255) + ((B2 & 255) - (A & 255)) * t; return '#' + [r, g, bl].map(v => Math.round(v).toString(16).padStart(2, '0')).join(''); }
@@ -2061,7 +2181,8 @@ addEventListener('resize', () => { resize(); if (panelName === 'map') drawMap();
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else if (G){ const sec = Math.min(8 * 3600, Math.max(0, (Date.now() - G.wall) / 1000)); if (sec > 30){ const v = Math.round(incomePerHour() * sec / 3600); if (v > 0){ G.money += v; toast(`Your businesses earned ${fmt(v)} while you were away`, 'g'); } } G.wall = Date.now(); } });
 addEventListener('pagehide', save);
 // test hooks
-window.__pr = { get G(){ return G; }, V, sceneryAt, openRequest, pickMap:id => { tabs.map = id; renderPanel(); }, depart, openPanel, closePanel, segmentDone, roadEvent, refreshHud, newGame:() => { newGame(); buildSprites(); V.arrive(G.town); } };
+window.__pr = { get G(){ return G; }, V, sceneryAt, openRequest,
+  cargoShot:list => { const saved = bx, keep = G.cargo, c = mk(68 * list.length, 34); bx = c.getContext("2d"); bx.fillStyle = "#9fd0f0"; bx.fillRect(0, 0, c.width, c.height); list.forEach(([g, n], i) => { G.cargo = { [g]:n }; drawCargo(i * 68 + 4, 6, 0); bx.drawImage(sprites.cars.freight, i * 68 + 4, 6); }); bx = saved; G.cargo = keep; return c.toDataURL(); }, pickMap:id => { tabs.map = id; renderPanel(); }, depart, openPanel, closePanel, segmentDone, roadEvent, refreshHud, newGame:() => { newGame(); buildSprites(); V.arrive(G.town); } };
 boot();
 })();
 </script>
