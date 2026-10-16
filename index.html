@@ -1,0 +1,1407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- no zooming; the game fills the screen -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- opened from the home screen: no Safari bars, black status bar -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<!-- black-translucent: the page always runs under the status bar area, so iOS has no bar-sized strip to
+     leave behind when the app opens sideways (the game already keeps clear of the notch itself) -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pixel Rails">
+<meta name="theme-color" content="#2a1a14">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+  html,body{overscroll-behavior:none;touch-action:manipulation;-webkit-text-size-adjust:100%}   /* no bounce, no double-tap zoom */
+  /* like an app: the page itself never moves; long menus scroll inside the game area.
+     The page is pinned to the screen (position:fixed) so it cannot sit scrolled or pushed off to one side, and its
+     height comes from --app-h, the size the script below measures, because an iPhone opened sideways sometimes
+     hands the page a stale size or offset for a moment (the "whole screen shifted over" launch). */
+  html,body{position:fixed;left:0;top:0;width:100%;height:100%;height:var(--app-h,100%);overflow:hidden}
+  #ui{height:100%;height:100dvh;height:var(--app-h,100dvh);min-height:0 !important;overflow:hidden;overscroll-behavior:none}
+  #game{height:var(--app-h,100%);bottom:auto !important}
+  /* the stats list is the only screen allowed to scroll, and only up and down */
+  
+</style>
+<script>
+  // Launch guard for the shifted screen: measure the real screen, pin the page to it, put the page back at 0,0,
+  // and if the iPhone is still reporting a stale size make it measure again. Runs at launch, a few more times in
+  // the first seconds, and whenever the app comes back, rotates or resizes. It never reloads the app.
+  (function(){
+    var root = document.documentElement, nudges = 0, last = '';
+    var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var standalone = function(){ return navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches); };
+    var angle = function(){ var a = (screen.orientation && typeof screen.orientation.angle === 'number') ? screen.orientation.angle : window.orientation; return typeof a === 'number' ? Math.abs(a) % 180 : null; };
+    // what the screen really is: on an iPhone home-screen app that is the whole display, turned the way the phone is held
+    function real(){
+      var w = window.innerWidth, h = window.innerHeight, a = angle();
+      if (ios && standalone() && a !== null && screen.width && screen.height) {
+        var long = Math.max(screen.width, screen.height), short = Math.min(screen.width, screen.height);
+        var ew = a === 90 ? long : short, eh = a === 90 ? short : long;
+        // only a big gap is a stale size (the page still thinks the phone is the other way up); small gaps are real bars
+        if (Math.abs(w - ew) > 60 || Math.abs(h - eh) > 60) return { w:ew, h:eh, stale:true };
+      }
+      return { w:w, h:h, stale:false };
+    }
+    function settle(){
+      try {
+        var r = real(), vv = window.visualViewport;
+        root.style.setProperty('--app-h', r.h + 'px');
+        var moved = window.scrollX || window.scrollY || root.scrollTop || (document.body && document.body.scrollTop) || (vv && (vv.offsetTop || vv.offsetLeft || vv.pageTop || vv.pageLeft));
+        if (moved) { window.scrollTo(0, 0); root.scrollTop = 0; if (document.body) document.body.scrollTop = 0; }
+        if ((r.stale || moved) && nudges < 6) {                      // make the iPhone lay the page out again
+          nudges++;
+          var m = document.querySelector('meta[name=viewport]'), c = m && m.getAttribute('content');
+          if (m) { m.setAttribute('content', c + ', height=device-height'); setTimeout(function(){ m.setAttribute('content', c); }, 60); }
+        }
+        var key = r.w + 'x' + r.h + (r.stale ? 's' : '') + (moved ? 'm' : '');
+        if (key !== last) { last = key; setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 80); }   // the game re-fits its court
+      } catch (e) {}
+    }
+    try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (e) {}
+    settle();
+    [0, 60, 150, 300, 600, 1000, 1600, 2500, 4000].forEach(function(ms){ setTimeout(settle, ms); });
+    ['DOMContentLoaded', 'load', 'pageshow', 'resize', 'orientationchange', 'focus'].forEach(function(ev){ window.addEventListener(ev, function(){ settle(); setTimeout(settle, 250); setTimeout(settle, 700); }); });
+    document.addEventListener('visibilitychange', function(){ if (!document.hidden) { nudges = 0; settle(); setTimeout(settle, 250); setTimeout(settle, 700); } });
+    if (window.visualViewport) { visualViewport.addEventListener('resize', settle); visualViewport.addEventListener('scroll', settle); }
+  })();
+</script>
+<script>
+  // No surprise updates: the app never reloads itself. A new version (only when we publish one) shows the
+  // next time the app is closed and opened again, because the game loads fresh from the server at launch.
+  if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js', { updateViaCache:'none' }).catch(() => {}));
+</script>
+<title>Pixel Rails</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Silkscreen:wght@400;700&display=swap">
+<style>
+/* digits (and $) come from Silkscreen: Pixelify's 5 looks like an S */
+@font-face{font-family:"PRDigits";font-weight:400;src:url(https://fonts.gstatic.com/s/silkscreen/v6/m8JXjfVPf62XiF7kO-i9YLNlaw.woff2) format('woff2');unicode-range:U+0024,U+0030-0039;size-adjust:82%}
+@font-face{font-family:"PRDigits";font-weight:600 800;src:url(https://fonts.gstatic.com/s/silkscreen/v6/m8JUjfVPf62XiF7kO-i9aAhAfmyi2A.woff2) format('woff2');unicode-range:U+0024,U+0030-0039;size-adjust:82%}
+:root{
+  --ink:#2a1a14; --wood:#8a5a34; --wood-d:#5e3a20; --wood-l:#b07a4a;
+  --paper:#f4e4c1; --paper-d:#e6cf9f; --paper-dd:#cfb17a;
+  --red:#b8322f; --green:#3f8a3e; --gold:#e8b23a; --blue:#2f6fb0;
+  --px:"Silkscreen","Courier New",monospace;
+  --body:"PRDigits","Pixelify Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#1b1320;color:var(--ink);overflow:hidden}
+body{font:15px/1.25 var(--body);-webkit-user-select:none;user-select:none;touch-action:manipulation}
+button{font:inherit;color:inherit;cursor:pointer}
+#game{position:fixed;inset:0;overflow:hidden}
+#scene{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+img.px{image-rendering:pixelated}
+
+/* ---- top HUD ---- */
+#hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:flex-start;gap:8px;
+  padding:calc(env(safe-area-inset-top) + 6px) max(10px,env(safe-area-inset-right)) 0 max(10px,env(safe-area-inset-left));pointer-events:none}
+.chip{pointer-events:auto;display:flex;align-items:center;gap:6px;background:var(--paper);border:3px solid var(--ink);border-radius:8px;
+  box-shadow:inset 0 -3px 0 var(--paper-dd);padding:3px 9px 4px;font:700 15px var(--px);white-space:nowrap}
+.chip img{width:18px;height:18px}
+#money{font-size:17px;color:#2d5a1c}
+#where{flex:1;justify-content:center;font-family:var(--body);font-weight:700;font-size:15px;min-width:0;overflow:hidden}
+#where .prog{display:flex;gap:2px;margin-left:6px}
+#where .prog i{width:9px;height:9px;border:2px solid var(--ink);border-radius:2px;background:var(--paper-d)}
+#where .prog i.on{background:var(--gold)}
+#news{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 46px);max-width:70%;
+  background:rgba(42,26,20,.82);color:#fbe7b5;border-radius:6px;padding:3px 10px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;transition:opacity .4s}
+#news b{color:#ffd166}
+
+/* ---- bottom bar (Tiny Rails style) ---- */
+#bar{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;gap:6px;
+  padding:0 max(8px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 6px) max(8px,env(safe-area-inset-left))}
+.tb{position:relative;width:58px;height:50px;border:3px solid var(--ink);border-radius:9px;background:linear-gradient(#d8a873,#b57f4b);
+  box-shadow:inset 0 3px 0 #ecc694,inset 0 -4px 0 #8a5a34,0 3px 0 rgba(0,0,0,.35);display:grid;place-items:center;padding:0}
+.tb img{width:36px;height:36px}
+.tb:active{transform:translateY(2px);box-shadow:inset 0 3px 0 #ecc694,inset 0 -2px 0 #8a5a34}
+.tb.on{background:linear-gradient(#f2cf8e,#d9a560)}
+.tb:disabled{filter:grayscale(.8) brightness(.7);cursor:default}
+.tb .dot{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;border:2px solid var(--ink);font:700 11px/14px var(--px);padding:0 3px}
+
+/* ---- panels ---- */
+#panel{position:absolute;top:calc(env(safe-area-inset-top) + 44px);bottom:calc(env(safe-area-inset-bottom) + 64px);
+  left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));max-width:900px;margin:0 auto;
+  background:var(--paper);border:3px solid var(--ink);border-radius:10px;box-shadow:inset 0 0 0 3px var(--paper-d),0 6px 0 rgba(0,0,0,.35);
+  display:flex;flex-direction:column;overflow:hidden}
+#panel[hidden]{display:none}
+.ph{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 12px;background:var(--wood);color:#fbe7b5;border-bottom:3px solid var(--ink)}
+.ph h2{margin:0;font:700 17px var(--px);letter-spacing:.02em;flex:1}
+.ph .sub{font-size:13px;opacity:.9}
+.x{width:32px;height:30px;border:2px solid var(--ink);border-radius:6px;background:#e9c891;font:700 16px var(--px);padding:0}
+.pb{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 10px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tab{border:2px solid var(--ink);border-radius:6px;background:var(--paper-d);padding:3px 10px;font-weight:700}
+.tab.on{background:var(--gold)}
+.muted{color:#7a5a3c}
+.small{font-size:12.5px}
+.btn{border:2px solid var(--ink);border-radius:6px;background:#e9c891;padding:3px 9px;font-weight:700;box-shadow:inset 0 -2px 0 #c39a5c;white-space:nowrap}
+.btn:active{transform:translateY(1px)}
+.btn.go{background:#8fd16a;box-shadow:inset 0 -2px 0 #5d9e3e}
+.btn.bad{background:#f08b6b;box-shadow:inset 0 -2px 0 #c0563a}
+.btn.gold{background:#ffd166;box-shadow:inset 0 -2px 0 #d1a03a}
+.btn:disabled{opacity:.4;cursor:default;transform:none}
+.big{font-size:17px;padding:6px 14px}
+.num{font-family:var(--px);font-weight:700}
+.up{color:#2d7a1c}.dn{color:#b8322f}
+.row{display:flex;align-items:center;gap:8px}
+.grow{flex:1;min-width:0}
+.card{background:#fbf1d8;border:2px solid var(--ink);border-radius:8px;padding:6px 9px;margin-bottom:6px}
+.card.hl{background:#fff6c9}
+.bar{height:8px;border:2px solid var(--ink);border-radius:4px;background:#ddc79a;overflow:hidden;min-width:50px}
+.bar i{display:block;height:100%}
+table.mk{width:100%;border-collapse:collapse}
+table.mk th{font:700 11px var(--px);text-align:left;color:#7a5a3c;padding:2px 4px;border-bottom:2px solid var(--paper-dd)}
+table.mk td{padding:3px 4px;border-bottom:1px solid var(--paper-d);vertical-align:middle;white-space:nowrap}
+table.mk td.r,table.mk th.r{text-align:right}
+table.mk img{width:22px;height:22px;vertical-align:middle}
+.tag{display:inline-block;font:700 10px var(--px);padding:1px 5px;border-radius:4px;border:1.5px solid var(--ink);margin-left:4px;vertical-align:middle}
+.tag.p{background:#bfe3a5}.tag.w{background:#ffc98a}.tag.e{background:#ffd166}.tag.il{background:#d9a3e8}
+.capline{display:flex;gap:14px;align-items:center;margin-bottom:6px;font-weight:700}
+
+/* map */
+.mapwrap{display:flex;gap:10px;height:100%}
+.mapbox{position:relative;flex:1.4;min-height:180px;border:2px solid var(--ink);border-radius:8px;overflow:hidden;background:#cdb886}
+.mapbox canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+.mapbox .lbl{position:absolute;transform:translate(-50%,0);font:700 11px var(--body);background:rgba(244,228,193,.92);border:1.5px solid var(--ink);border-radius:4px;padding:0 4px;white-space:nowrap;pointer-events:none}
+.mapbox .lbl.here{background:#ffd166}
+.mapbox .lbl.sel{background:#8fd16a}
+.mapinfo{flex:1;overflow-y:auto;min-width:0}
+
+/* modal (events, arrivals) */
+#modal{position:absolute;inset:0;display:grid;place-items:center;background:rgba(20,12,10,.45);padding:12px}
+#modal[hidden]{display:none}
+.mb{width:min(460px,94vw);max-height:calc(100% - 10px);overflow-y:auto;background:var(--paper);border:3px solid var(--ink);border-radius:10px;box-shadow:inset 0 0 0 3px var(--paper-d),0 6px 0 rgba(0,0,0,.4)}
+.mb h3{margin:0;padding:7px 12px;background:var(--wood);color:#fbe7b5;font:700 16px var(--px);border-bottom:3px solid var(--ink)}
+.mb .t{padding:9px 12px 4px}
+.mb .ch{display:flex;flex-direction:column;gap:6px;padding:6px 12px 12px}
+.mb .ch .btn{text-align:left;font-size:15px;padding:6px 10px;white-space:normal}
+.lines div{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dashed var(--paper-dd)}
+
+#toasts{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 72px);display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none}
+.toast{background:var(--paper);border:2px solid var(--ink);border-radius:7px;padding:3px 10px;font-weight:700;font-size:14px;animation:tin .25s ease-out}
+.toast.g{background:#c9efb0}.toast.r{background:#ffc2ad}
+@keyframes tin{from{transform:translateY(-8px);opacity:0}}
+
+#rotate{position:absolute;inset:0;display:none;place-items:center;text-align:center;background:#2a1a14;color:#fbe7b5;font:700 18px var(--px);padding:30px}
+@media (orientation:portrait) and (max-width:700px){#rotate{display:grid}}
+@media (max-height:340px){.tb{width:52px;height:44px}.tb img{width:32px;height:32px}#panel{bottom:calc(env(safe-area-inset-bottom) + 56px)}}
+</style>
+
+<div id="game">
+  <canvas id="scene"></canvas>
+  <div id="hud">
+    <div class="chip" id="moneyChip"><img class="px" id="coinImg" alt=""><span id="money">$0</span></div>
+    <div class="chip" id="where"></div>
+    <div class="chip" id="dayChip"></div>
+  </div>
+  <div id="news"></div>
+  <div id="panel" hidden></div>
+  <div id="bar"></div>
+  <div id="toasts"></div>
+  <div id="modal" hidden></div>
+  <div id="rotate">Turn your phone sideways<br>to ride the rails</div>
+</div>
+
+<script>
+(function(){
+'use strict';
+// =====================================================================================
+//  small helpers
+// =====================================================================================
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const fmt = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+function mulberry(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+let R = Math.random;
+const rf = (a, b) => a + R() * (b - a);
+const ri = (a, b) => a + Math.floor(R() * (b - a + 1));
+const pick = a => a[Math.floor(R() * a.length)];
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+
+// =====================================================================================
+//  world data
+// =====================================================================================
+const GOODS = [
+  { id:'coal',    n:'Coal',         base:12,  col:'#2e2e33', hi:'#5c5c66' },
+  { id:'grain',   n:'Grain',        base:16,  col:'#e3bd4f', hi:'#f6dd8a' },
+  { id:'oranges', n:'Oranges',      base:24,  col:'#f08a24', hi:'#ffc06a' },
+  { id:'lumber',  n:'Lumber',       base:20,  col:'#9b6a3c', hi:'#c99560' },
+  { id:'iron',    n:'Iron',         base:34,  col:'#7d8794', hi:'#b9c2cc' },
+  { id:'cotton',  n:'Cotton',       base:28,  col:'#f2efe6', hi:'#ffffff' },
+  { id:'whiskey', n:'Whiskey',      base:60,  col:'#b5651d', hi:'#e5a050' },
+  { id:'cattle',  n:'Cattle',       base:75,  col:'#6b4a2f', hi:'#a77b54' },
+  { id:'gold',    n:'Gold Ore',     base:130, col:'#f2c12e', hi:'#fff09a' },
+  { id:'luxury',  n:'Luxury Goods', base:170, col:'#8e44ad', hi:'#c58be0' },
+];
+const CONTRA = { id:'moon', n:'Moonshine', base:95, col:'#9fd8e8', hi:'#e2f6fb' };   // illegal
+const GOOD = Object.fromEntries([...GOODS, CONTRA].map(g => [g.id, g]));
+
+// map is 100 x 62; biomes pick the scenery; law = chance an inspector checks your cargo
+const TOWNS = [
+  { id:'fair', n:'Fairhaven',     x:30, y:36, biome:'plains', prod:['grain','cattle'],   size:3, law:.35, bank:1, shop:1, roof:'#b8322f' },
+  { id:'cott', n:'Cotton Bend',   x:46, y:46, biome:'plains', prod:['cotton','grain'],   size:2, law:.25, roof:'#3f7fb8' },
+  { id:'sunv', n:'Sunvale',       x:63, y:54, biome:'coast',  prod:['oranges'],          size:2, law:.25, roof:'#e08a2e' },
+  { id:'port', n:'Port Bell',     x:84, y:45, biome:'coast',  prod:['luxury','whiskey'], size:3, law:.45, bank:1, shop:1, roof:'#2f6d8a' },
+  { id:'gran', n:'Grand Central', x:62, y:31, biome:'city',   prod:['luxury'],           size:3, law:.6,  bank:1, shop:1, roof:'#6a4a8a' },
+  { id:'pine', n:'Pine Hollow',   x:20, y:17, biome:'forest', prod:['lumber'],           size:1, law:.15, roof:'#4a7a3a' },
+  { id:'iron', n:'Ironvale',      x:41, y:13, biome:'forest', prod:['iron','coal'],      size:2, law:.3,  shop:1, roof:'#5a5a6a' },
+  { id:'fros', n:'Frostpeak',     x:58, y:7,  biome:'snow',   prod:['coal','lumber'],    size:1, law:.15, roof:'#a8322e' },
+  { id:'silv', n:'Silver Creek',  x:80, y:14, biome:'snow',   prod:['gold'],             size:2, law:.2,  roof:'#2e4a73' },
+  { id:'mesa', n:'Red Mesa',      x:11, y:49, biome:'desert', prod:['cattle','whiskey'], size:1, law:0,   shady:1, roof:'#c0563a' },
+];
+const TOWN = Object.fromEntries(TOWNS.map(t => [t.id, t]));
+const EDGES = [['fair','cott'],['cott','sunv'],['sunv','port'],['port','gran'],['gran','cott'],['gran','fair'],['fair','pine'],
+  ['pine','iron'],['iron','fros'],['fros','silv'],['silv','gran'],['iron','gran'],['fair','mesa'],['mesa','cott'],['silv','port']];
+const ADJ = {}; TOWNS.forEach(t => ADJ[t.id] = []);
+const dist = (a, b) => Math.hypot(TOWN[a].x - TOWN[b].x, TOWN[a].y - TOWN[b].y);
+EDGES.forEach(([a, b]) => { const d = dist(a, b); ADJ[a].push([b, d]); ADJ[b].push([a, d]); });
+function route(from, to){                                  // dijkstra over the rail graph
+  const D = {}, P = {}, Q = new Set(TOWNS.map(t => t.id));
+  TOWNS.forEach(t => D[t.id] = Infinity); D[from] = 0;
+  while (Q.size){
+    let u = null; for (const q of Q) if (u === null || D[q] < D[u]) u = q;
+    Q.delete(u); if (u === to) break;
+    for (const [v, w] of ADJ[u]) if (D[u] + w < D[v]) { D[v] = D[u] + w; P[v] = u; }
+  }
+  const path = [to]; while (path[0] !== from) path.unshift(P[path[0]]);
+  return { path, d:D[to] };
+}
+const SEG_LEN = 9;                                          // map units per segment
+const segsFor = d => Math.max(2, Math.round(d / SEG_LEN));
+
+const LOCOS = [
+  { n:'Little Rusty',    speed:1.0,  cars:3, coal:1.0, price:0,     col:'#2b2d3a', trim:'#b8322f' },
+  { n:'Prairie Runner',  speed:1.25, cars:4, coal:1.2, price:1800,  col:'#2d4a3a', trim:'#d6a83c' },
+  { n:'Iron Duke',       speed:1.5,  cars:6, coal:1.5, price:6000,  col:'#3a2d4a', trim:'#d6a83c' },
+  { n:'Silver Comet',    speed:1.85, cars:8, coal:1.8, price:18000, col:'#5a6478', trim:'#e8eef7' },
+];
+const CARS = {
+  freight: { n:'Freight Car',  price:450,  cap:10,  desc:'Holds 10 crates of cargo.' },
+  coach:   { n:'Coach',        price:550,  seats:10, desc:'10 seats for regular passengers.' },
+  luxury:  { n:'Luxury Car',   price:2200, rich:6,  desc:'6 plush seats. Rich passengers pay 3-4x.' },
+  dining:  { n:'Dining Car',   price:1400,          desc:'All passenger fares +15%. Keeps crew fed (mood).' },
+  casino:  { n:'Casino Car',   price:2800,          desc:'Passengers gamble on the way: house winnings every segment. A card dealer doubles it.' },
+  smug:    { n:'Hidden Hold',  price:1600, cap:4,   desc:'Secret compartment for 4 crates. Halves the chance inspectors find contraband.' },
+};
+const ROLES = {
+  engineer:  { n:'Engineer',    desc:'Faster trips, less coal' },
+  conductor: { n:'Conductor',   desc:'Higher passenger fares' },
+  guard:     { n:'Guard',       desc:'Fights bandits, distracts inspectors' },
+  cook:      { n:'Cook',        desc:'Tips from passengers, happier crew' },
+  dealer:    { n:'Card Dealer', desc:'Casino car earns more' },
+};
+const FIRST = ['Abe','Bess','Cal','Dot','Eli','Faye','Gus','Hattie','Ike','June','Kit','Lou','Mae','Ned','Opal','Pete','Rosa','Sam','Tess','Walt','Ada','Boone','Clem','Della','Ezra','Flo','Hank','Iris','Jeb','Lottie'];
+const LAST = ['Cobb','Hale','Pike','Rowe','Stone','Marsh','Fenn','Gray','Holt','Lane','Moss','Reed','Shaw','Tate','Vance','Wade','Boyd','Crane','Dunn','Frost'];
+const BIZ = {   // investment kinds; a town gets the ones that fit what it makes
+  coal:'Coal Mine', iron:'Iron Works', gold:'Gold Mine', lumber:'Sawmill', grain:'Grain Mill', cotton:'Cotton Gin',
+  oranges:'Orange Grove', cattle:'Cattle Ranch', whiskey:'Distillery', luxury:'Trading House',
+};
+
+// =====================================================================================
+//  game state
+// =====================================================================================
+const SAVE_KEY = 'pixelrails.v1';
+let G = null;
+
+function newGame(){
+  const seed = Math.floor(Math.random() * 1e9);
+  R = mulberry(seed);
+  G = { v:1, seed, money:600, day:1, tod:.1, town:'fair', trip:null, cargo:{}, paid:{}, pax:[], contracts:[],
+    train:{ loco:0, cars:['freight','coach'], cond:100 }, crew:[], loan:0, shares:{}, events:[], news:[], mk:{}, offers:{},
+    seen:{}, biz:{}, wageDays:0, freeCoal:0, wall:Date.now(), stats:{ trips:0, earned:0, best:0 }, cid:1, nextNewsDay:2 };
+  // markets: every world rolls its own prices, so nobody knows the best route ahead of time
+  for (const t of TOWNS){
+    const m = {}; G.mk[t.id] = m;
+    for (const g of GOODS) m[g.id] = { mult:rf(.85, 1.2), drift:0, press:0 };
+    for (const g of t.prod) m[g].mult = rf(.5, .8);
+    const others = shuffle(GOODS.map(g => g.id).filter(g => !t.prod.includes(g)));
+    others.slice(0, ri(3, 4)).forEach(g => m[g].mult = rf(1.3, 2.5));
+    m.moon = { mult: t.shady ? .45 : rf(1.9, 2.8), drift:0, press:0 };
+    // investments
+    G.biz[t.id] = t.prod.map((g, i) => {
+      const price = Math.round(rf(250, 520) * (GOOD[g].base / 30 + 1) / 10) * 10;
+      return { id:t.id + i, n:BIZ[g], price, rate:rf(.07, .13), owned:0 };
+    });
+  }
+  TOWNS.forEach(t => refreshOffers(t.id, true));
+  R = Math.random;
+  G.news.unshift({ day:1, txt:'Welcome to the rails! Buy low where goods are made, sell high where they are wanted.' });
+  noteSeen('fair');
+}
+
+function save(){ if (!G) return; G.wall = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) {} }
+function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && g.v === 1) return g; } } catch (e) {} return null; }
+
+// ---- prices ----
+function price(town, g){
+  const m = G.mk[town][g]; let p = GOOD[g].base * m.mult * (1 + m.drift) * (1 - m.press);
+  for (const e of G.events) if (e.town === town && e.good === g) p *= e.f;
+  return Math.max(1, p);
+}
+const buyP  = (t, g) => Math.max(1, Math.ceil(price(t, g) * 1.05));
+const sellP = (t, g) => Math.max(1, Math.floor(price(t, g) * .95));
+function noteSeen(t){ const p = {}; for (const g of GOODS) p[g.id] = [buyP(t, g.id), sellP(t, g.id)]; G.seen[t] = { day:Math.floor(G.day), p }; }
+
+// ---- train numbers ----
+const loco = () => LOCOS[G.train.loco];
+const capOf = () => G.train.cars.reduce((s, c) => s + (c === 'freight' ? CARS.freight.cap : 0), 0);
+const hideCap = () => G.train.cars.filter(c => c === 'smug').length * CARS.smug.cap;
+const seatsOf = () => G.train.cars.filter(c => c === 'coach').length * CARS.coach.seats;
+const richOf = () => G.train.cars.filter(c => c === 'luxury').length * CARS.luxury.rich;
+const cargoUsed = () => Object.entries(G.cargo).reduce((s, [g, q]) => s + (g === 'moon' ? 0 : q), 0);
+const moonUsed = () => G.cargo.moon || 0;
+const paxUsed = cls => G.pax.filter(p => p.cls === cls).reduce((s, p) => s + p.n, 0);
+const has = c => G.train.cars.includes(c);
+function crew(role){ return G.crew.find(c => c.role === role); }
+function skill(role){                                       // mood changes how hard they work
+  const c = crew(role); if (!c) return 0;
+  return clamp(c.skill + (c.mood >= 75 ? 1 : 0) - (c.mood < 40 ? 1 : 0) - (c.mood < 20 ? 1 : 0), 0, 6);
+}
+const coalPrice = () => 11;
+const segTime = () => 6 / loco().speed / (1 + .07 * skill('engineer')) * (G.train.cond < 50 ? 1.25 : 1);
+const coalPerSeg = () => loco().coal * (1 - .06 * skill('engineer')) * coalPrice();
+function netWorth(){
+  let v = G.money - G.loan;
+  for (const t in G.biz) for (const b of G.biz[t]) v += b.owned * b.price * .7;
+  v += LOCOS[G.train.loco].price * .5 + G.train.cars.reduce((s, c) => s + CARS[c].price * .5, 0);
+  return v;
+}
+
+// ---- offers at stations: passengers, contracts, crew for hire ----
+function refreshOffers(tid, full){
+  const t = TOWN[tid], o = G.offers[tid] || (G.offers[tid] = { pax:[], con:[], hire:[] });
+  const others = TOWNS.filter(x => x.id !== tid);
+  // passengers
+  o.pax = o.pax.filter(() => !full && R() < .5);
+  const nPax = ri(2, 2 + t.size) - o.pax.length;
+  for (let i = 0; i < nPax; i++){
+    const to = pick(others).id, d = route(tid, to).d, rich = R() < .22 + .06 * t.size;
+    const fare = Math.round((7 + d * .8) * (rich ? rf(3, 4) : rf(.9, 1.15)));
+    o.pax.push({ id:G.cid++, to, cls:rich ? 'rich' : 'std', n:rich ? ri(1, 3) : ri(2, 7), fare });
+  }
+  // contracts
+  o.con = o.con.filter(() => !full && R() < .6);
+  while (o.con.length < 1 + Math.min(2, t.size)){
+    const to = pick(others).id, g = pick(GOODS), qty = ri(4, 14) - (g.base > 100 ? 2 : 0), d = route(tid, to).d;
+    const due = Math.floor(G.day) + Math.ceil(segsFor(d) * .25) + ri(2, 5);
+    const pay = Math.round((qty * g.base * rf(1.7, 2.5) + d * 6) / 5) * 5;
+    o.con.push({ id:G.cid++, from:tid, to, good:g.id, qty, due, pay, fine:Math.round(pay * .35 / 5) * 5 });
+  }
+  // crew for hire
+  o.hire = o.hire.filter(() => !full && R() < .5);
+  while (o.hire.length < 1 + (t.size > 1 ? 1 : 0) + (R() < .4 ? 1 : 0)){
+    const role = pick(Object.keys(ROLES)), sk = clamp(ri(1, 3) + (R() < .2 ? 1 : 0) + (t.size === 3 && R() < .3 ? 1 : 0), 1, 5);
+    o.hire.push({ id:G.cid++, role, name:pick(FIRST) + ' ' + pick(LAST), skill:sk, wage:sk * 9 + ri(4, 10), mood:ri(60, 80), look:ri(0, 9999) });
+  }
+}
+
+// ---- days pass only while the train is moving ----
+const NEWS = [
+  { t:'Gold rush in {T}! Prospectors pay top dollar for tools, grub and drink.', fx:[['iron',1.7],['grain',1.5],['whiskey',1.5]] },
+  { t:'Harvest festival in {T}: grain and oranges flood the market.', fx:[['grain',.5],['oranges',.55]] },
+  { t:'Mine collapse near {T}! Coal and iron in short supply.', fx:[['coal',1.9],['iron',1.7]] },
+  { t:'A cattle drive rolls into {T} and beef prices tumble.', fx:[['cattle',.5]] },
+  { t:'High-society wedding season in {T}: luxury goods wanted.', fx:[['luxury',1.7],['whiskey',1.5]] },
+  { t:'Fire at the {T} lumberyard! Builders want lumber.', fx:[['lumber',2.1]] },
+  { t:'Drought in {T}: the crops have failed.', fx:[['grain',2.0],['oranges',1.8]] },
+  { t:'Temperance league shuts the saloons in {T}.', fx:[['whiskey',.4]] },
+  { t:'New textile mill in {T} buying cotton by the ton.', fx:[['cotton',1.9]] },
+  { t:'Railroad boom in {T}: iron and lumber wanted for new track.', fx:[['iron',1.6],['lumber',1.6]] },
+  { t:'Winter coming early to {T}: coal prices climb.', fx:[['coal',2.0]] },
+  { t:'Bank scare in {T}: folks are buying gold.', fx:[['gold',1.6]] },
+  { t:'Orange blight in {T}! No fruit to be had.', fx:[['oranges',2.2]] },
+  { t:'Sheriff cracks down in {T}: moonshine runners beware.', fx:[['moon',.6]], law:1 },
+];
+function newsEvent(){
+  const n = pick(NEWS), t = pick(TOWNS), dur = ri(3, 6);
+  for (const [g, f] of n.fx) G.events.push({ town:t.id, good:g, f, until:G.day + dur });
+  const txt = n.t.replace('{T}', t.n);
+  G.news.unshift({ day:Math.floor(G.day), txt }); G.news.length = Math.min(G.news.length, 25);
+  showNews(txt);
+}
+function dayTick(){
+  // prices wander, sold-out markets recover
+  for (const t in G.mk) for (const g in G.mk[t]){
+    const m = G.mk[t][g];
+    m.press *= .62;
+    m.drift = clamp(m.drift * .8 + (Math.random() - .5) * .14, -.3, .3);
+  }
+  G.events = G.events.filter(e => e.until > G.day);
+  if (G.day >= G.nextNewsDay){ newsEvent(); G.nextNewsDay = G.day + ri(1, 3); }
+  // loan interest
+  if (G.loan > 0){ const i = Math.ceil(G.loan * .025); G.loan += i; }
+  // crew get restless on the road; a cook keeps spirits up
+  for (const c of G.crew) c.mood = clamp(c.mood - (has('dining') ? 1 : 3) + (skill('cook') ? 1 : 0), 0, 100);
+  // contracts past due
+  for (const c of G.contracts.slice()) if (Math.floor(G.day) > c.due){
+    G.contracts.splice(G.contracts.indexOf(c), 1); G.money -= c.fine;
+    toast(`Contract failed: ${GOOD[c.good].n} to ${TOWN[c.to].n}. Fined ${fmt(c.fine)}`, 'r');
+  }
+  TOWNS.forEach(t => refreshOffers(t.id, false));
+}
+function advanceDay(amount){
+  const before = Math.floor(G.day);
+  G.day += amount; G.wageDays += amount;
+  G.tod = (G.tod + amount) % 1;
+  for (let d = before + 1; d <= Math.floor(G.day); d++) dayTick();
+}
+
+// ---- investments pay in real time, even while the app is closed (capped at 8 hours) ----
+function incomePerHour(){ let s = 0; for (const t in G.biz) for (const b of G.biz[t]) s += b.owned * b.price * b.rate; return s; }
+let incomeAcc = 0;
+function accrue(sec){
+  const v = incomePerHour() * sec / 3600; if (!v) return 0;
+  incomeAcc += v;
+  if (incomeAcc >= 1){ const w = Math.floor(incomeAcc); incomeAcc -= w; G.money += w; G.stats.earned += w; }
+  return v;
+}
+
+// =====================================================================================
+//  trips
+// =====================================================================================
+function tripPreview(to){
+  const r = route(G.town, to), segs = segsFor(r.d);
+  return { ...r, segs, coal:Math.round(coalPerSeg() * segs), days:segs * .25, secs:Math.round(segs * segTime()) };
+}
+function depart(to){
+  const p = tripPreview(to);
+  if (G.money < p.coal && G.freeCoal < p.segs){ toast('Not enough money for coal!', 'r'); return; }
+  closePanel();
+  // biome for each segment: first half looks like where you left, second half like where you are going
+  const legs = [];
+  for (let i = 0; i < p.segs; i++){
+    const f = (i + .5) / p.segs * (p.path.length - 1), k = Math.min(p.path.length - 2, Math.floor(f));
+    legs.push(TOWN[f - k < .5 ? p.path[k] : p.path[k + 1]].biome);
+  }
+  G.trip = { from:G.town, to, path:p.path, segs:p.segs, seg:0, el:0, legs, log:[], tips:0, sick:false };
+  G.town = null; G.stats.trips++;
+  V.depart();
+  save(); refreshHud();
+}
+function segmentDone(){
+  const T = G.trip;
+  if (G.freeCoal > 0) G.freeCoal--; else { const c = Math.round(coalPerSeg()); G.money -= c; T.coal = (T.coal || 0) + c; }
+  G.train.cond = clamp(G.train.cond - rf(.7, 1.8), 0, 100);
+  // casino car: passengers gamble, the house wins
+  if (has('casino')){
+    const riders = paxUsed('std') + paxUsed('rich') * 3;
+    const w = Math.round(riders * (1.2 + .25 * skill('dealer')) * (skill('dealer') ? 2 : 1));
+    if (w){ G.money += w; T.log.push(['Casino winnings', w]); floatText('+' + fmt(w), '#ffd166'); }
+  }
+  if (skill('cook') && G.pax.length){ const tip = Math.round((paxUsed('std') + paxUsed('rich') * 2) * .6 * skill('cook')); if (tip){ G.money += tip; T.tips += tip; } }
+  advanceDay(.25);
+  T.seg++; T.el = 0;
+  if (T.seg >= T.segs) return arrive();
+  // random events on the road
+  if (Math.random() < .3 + (G.train.cond < 40 ? .1 : 0)) roadEvent();
+  save(); rerender();
+}
+function arrive(){
+  const T = G.trip, to = T.to, t = TOWN[to], lines = [];
+  if (T.coal) lines.push([`Coal (${T.segs} segments)`, -T.coal]);
+  lines.push(...T.log);
+  G.trip = null; G.town = to;
+  // fares
+  let fares = 0;
+  const mult = (1 + .06 * skill('conductor')) * (has('dining') ? 1.15 : 1) * (T.sick ? .8 : 1);
+  for (const p of G.pax.slice()) if (p.to === to){ fares += Math.round(p.fare * p.n * mult); G.pax.splice(G.pax.indexOf(p), 1); }
+  if (fares) lines.push(['Passenger fares', fares]);
+  if (T.tips) lines.push(['Tips (cook)', 0, T.tips]);
+  // contracts
+  for (const c of G.contracts.slice()) if (c.to === to && (G.cargo[c.good] || 0) >= c.qty){
+    G.cargo[c.good] -= c.qty; if (!G.cargo[c.good]) delete G.cargo[c.good];
+    G.contracts.splice(G.contracts.indexOf(c), 1); lines.push([`Contract: ${c.qty} ${GOOD[c.good].n}`, c.pay]); fares += c.pay;
+  }
+  // wages for the days on the road
+  let wages = 0;
+  if (G.crew.length){
+    const owed = Math.round(G.crew.reduce((s, c) => s + c.wage, 0) * G.wageDays);
+    if (G.money + fares >= owed){ wages = owed; G.crew.forEach(c => c.mood = clamp(c.mood + 4, 0, 100)); }
+    else { wages = Math.max(0, Math.floor(G.money + fares)); G.crew.forEach(c => c.mood = clamp(c.mood - 25, 0, 100)); lines.push(['Could not pay crew in full!', 0]); }
+    lines.push(['Crew wages', -wages]);
+  }
+  G.wageDays = 0;
+  const fee = 6 + t.size * 6; lines.push(['Station fee', -fee]);
+  G.money += fares - wages - fee; G.stats.earned += fares;
+  // unhappy crew misbehave
+  for (const c of G.crew.slice()){
+    if (c.mood < 25 && Math.random() < .35){ G.crew.splice(G.crew.indexOf(c), 1); lines.push([`${c.name} (${ROLES[c.role].n}) quit in a huff`, 0]); }
+    else if (c.mood < 30 && Math.random() < .25 && G.money > 50){ const s = Math.round(G.money * rf(.02, .05)); G.money -= s; lines.push([`Cash missing... ${c.name} looks guilty`, -s]); }
+  }
+  noteSeen(to);
+  G.stats.best = Math.max(G.stats.best, G.money);
+  V.arrive(to);
+  const inspect = moonUsed() > 0 && Math.random() < t.law * (has('smug') ? .5 : 1) * (1 - .1 * skill('guard'));
+  showArrival(t, lines, fares, inspect);
+  save(); refreshHud(); rerender();
+}
+
+// ---- road events ----
+function lose(g, frac){ const q = G.cargo[g] || 0, n = Math.max(1, Math.round(q * frac)); G.cargo[g] = q - n; if (G.cargo[g] <= 0) delete G.cargo[g]; return n; }
+const cargoKeys = () => Object.keys(G.cargo).filter(g => G.cargo[g] > 0);
+const ROAD = [
+  { w:() => 1, title:'Bandits!', text:() => 'Masked riders gallop alongside the train, pistols raised.',
+    ch:() => [
+      { t:`Pay them off (${fmt(Math.max(30, G.money * .08))})`, f:() => { const v = Math.round(Math.max(30, G.money * .08)); G.money -= v; return `They tip their hats and ride off with ${fmt(v)}.`; } },
+      { t:crew('guard') ? `Fight back (your guard ${crew('guard').name} is ready)` : 'Fight back', f:() => {
+        if (Math.random() < .3 + .12 * skill('guard')){ const v = ri(30, 120); G.money += v; return `Driven off! One of them dropped a saddlebag with ${fmt(v)}.`; }
+        const k = cargoKeys(); G.train.cond = clamp(G.train.cond - 6, 0, 100);
+        if (k.length){ const g = pick(k), n = lose(g, .35); return `They overpower you and haul off ${n} ${GOOD[g].n}.`; }
+        const v = Math.round(G.money * .12); G.money -= v; return `They overpower you and take ${fmt(v)}.`; } },
+      { t:'Full steam ahead!', f:() => {
+        if (Math.random() < .35 + .12 * G.train.loco){ G.train.cond = clamp(G.train.cond - 4, 0, 100); return 'The old engine roars and you leave them in the dust.'; }
+        const k = cargoKeys(); if (k.length){ const g = pick(k), n = lose(g, .25); return `Too slow! They jump aboard and grab ${n} ${GOOD[g].n}.`; }
+        return 'Too slow, but they find nothing worth taking.'; } },
+    ] },
+  { w:() => 1, title:'Cow on the tracks', text:() => 'A stubborn cow is standing right in the middle of the line, chewing.',
+    ch:() => [
+      { t:'Wait it out (lose a quarter day)', f:() => { advanceDay(.25); return 'An hour later she wanders off. Your crew grumbles about the wait.'; } },
+      { t:'Toot the whistle and nudge through', f:() => { if (Math.random() < .55) return 'She trots away indignantly. No harm done.'; G.train.cond = clamp(G.train.cond - 9, 0, 100); return 'Thud. The cowcatcher earns its name. (-9% condition)'; } },
+    ] },
+  { w:() => 1, title:'Stranded traveler', text:() => 'A traveler waves from beside a broken-down wagon.',
+    ch:() => [
+      { t:'Give them a ride', f:() => { if (Math.random() < .75){ const v = ri(15, 45); G.money += v; return `Grateful, they pay you ${fmt(v)} for the ride.`; } const v = ri(150, 300); G.money += v; return `Turns out they are a banker's daughter. Her father wires ${fmt(v)} as thanks!`; } },
+      { t:'Keep going', f:() => 'You chug past. They shake a fist at the caboose.' },
+    ] },
+  { w:() => 1, title:'Storm', text:() => 'Black clouds roll in and rain hammers the roof.',
+    ch:() => [
+      { t:'Slow down (lose a quarter day)', f:() => { advanceDay(.25); return 'You crawl through safely.'; } },
+      { t:'Push on through', f:() => { G.train.cond = clamp(G.train.cond - ri(5, 12), 0, 100); const k = cargoKeys().filter(g => ['grain','cotton','oranges'].includes(g));
+        if (k.length && Math.random() < .5){ const g = pick(k), n = lose(g, .2); return `Leaks in the freight car! ${n} ${GOOD[g].n} ruined.`; } return 'The train takes a beating but you keep your schedule.'; } },
+    ] },
+  { w:() => G.train.cond < 70 ? 1.5 : .5, title:'Hot axle', text:() => 'Smoke is pouring off a wheel bearing. The train is getting worn.',
+    ch:() => [
+      { t:'Stop and let it cool (lose a quarter day)', f:() => { advanceDay(.25); G.train.cond = clamp(G.train.cond + 3, 0, 100); return 'You patch it up as best you can.'; } },
+      { t:'Keep going and hope', f:() => { if (Math.random() < .5) return 'It holds. Phew.'; G.train.cond = clamp(G.train.cond - 15, 0, 100); return 'CRACK. That did not sound good. (-15% condition)'; } },
+    ] },
+  { w:() => 1, title:'Lucky find', text:() => 'Abandoned crates lie beside the tracks, half buried in weeds.',
+    ch:() => [
+      { t:'Load them up', f:() => { const g = pick(GOODS.slice(0, 7)), n = ri(2, 5), room = capOf() - cargoUsed(); if (room <= 0) return 'No room in the freight car. You leave them behind.';
+        const k = Math.min(n, room); G.cargo[g.id] = (G.cargo[g.id] || 0) + k; G.paid[g.id] = G.paid[g.id] || 0; return `Free cargo: ${k} ${g.n}!`; } },
+      { t:'Leave them', f:() => 'Probably for the best.' },
+    ] },
+  { w:() => 1, title:'Rival train!', text:() => 'A rival locomotive pulls up on the parallel track. Its driver hollers: "Race you to the water tower!"',
+    ch:() => [
+      { t:'Bet $50', f:() => race(50) }, { t:`Bet ${fmt(Math.max(100, Math.round(G.money * .15 / 10) * 10))}`, f:() => race(Math.max(100, Math.round(G.money * .15 / 10) * 10)) },
+      { t:'No thanks', f:() => 'He laughs and blows his whistle at you.' },
+    ] },
+  { w:() => 1, title:'A man in a long coat', text:() => 'At a water stop, a man offers crates of "medicine". You can smell the moonshine from here. Illegal, but it sells for a fortune in most towns.',
+    ch:() => {
+      const room = capOf() - cargoUsed() + hideCap() - moonUsed(), n = Math.min(ri(3, 6), Math.max(0, room)), p = Math.round(CONTRA.base * .35);
+      return [
+        { t:n ? `Buy ${n} crates for ${fmt(n * p)}` : 'No room for it', f:() => { if (!n || G.money < n * p) return 'You cannot take it.'; G.money -= n * p; G.cargo.moon = moonUsed() + n; G.paid.moon = p; return `Stowed ${n} crates of moonshine. Watch out for inspectors.`; } },
+        { t:'Send him away', f:() => 'He spits and slinks off into the brush.' },
+      ]; } },
+  { w:() => G.pax.length ? 1 : 0, title:'Sick passenger', text:() => 'A passenger has come down with a fever and the others are complaining.',
+    ch:() => [
+      { t:'Call a doctor at the next stop ($35)', f:() => { G.money -= 35; return 'The doctor fixes them right up. Passengers are relieved.'; } },
+      { t:'Ignore it', f:() => { G.trip.sick = true; return 'Grumbling spreads through the coach. Fares will be 20% lower this trip.'; } },
+    ] },
+  { w:() => G.crew.length >= 2 ? 1 : 0, title:'Crew squabble', text:() => { const a = G.crew[0], b = G.crew[1]; return `${a.name} and ${b.name} are shouting at each other in the cab.`; },
+    ch:() => [
+      { t:'Buy everyone a round ($25)', f:() => { G.money -= 25; G.crew.forEach(c => c.mood = clamp(c.mood + 10, 0, 100)); return 'Spirits are high again.'; } },
+      { t:'Let them sort it out', f:() => { const c = pick(G.crew); c.mood = clamp(c.mood - 15, 0, 100); return `${c.name} storms off to the caboose to sulk.`; } },
+    ] },
+  { w:() => 1, title:'Coal merchant', text:() => 'A coal merchant at a siding offers a cheap deal.',
+    ch:() => [
+      { t:'Buy 4 segments of coal for $25', f:() => { G.money -= 25; G.freeCoal += 4; return 'The tender is stuffed. The next 4 segments burn free coal.'; } },
+      { t:'No need', f:() => 'You wave him off.' },
+    ] },
+  { w:() => has('casino') ? 1 : 0, title:'Card sharp', text:() => 'A slick gambler in the casino car wants to play the house for high stakes.',
+    ch:() => [
+      { t:'Let him play ($150 pot)', f:() => { if (Math.random() < .45 + .06 * skill('dealer')){ G.money += 150; return `Your ${crew('dealer') ? 'dealer' : 'bartender'} cleans him out. +$150`; } G.money -= 150; return 'He walks away whistling with $150 of yours.'; } },
+      { t:'Throw him off the train', f:() => 'He lands in a haystack. Nice.' },
+    ] },
+];
+function race(bet){
+  if (G.money < bet) return 'You cannot cover that bet.';
+  const p = .32 + .13 * G.train.loco + .04 * skill('engineer') - (G.train.cond < 50 ? .1 : 0);
+  if (Math.random() < p){ G.money += bet; return `You win by a nose! +${fmt(bet)}`; }
+  G.money -= bet; G.train.cond = clamp(G.train.cond - 3, 0, 100); return `He beats you to the tower. -${fmt(bet)}`;
+}
+function roadEvent(){
+  const list = ROAD.filter(e => e.w() > 0), tot = list.reduce((s, e) => s + e.w(), 0);
+  let r = Math.random() * tot, ev = list[0]; for (const e of list){ r -= e.w(); if (r <= 0){ ev = e; break; } }
+  const ch = ev.ch();
+  paused = true;
+  modal(`<h3>${esc(ev.title)}</h3><div class="t">${esc(ev.text())}</div><div class="ch">${ch.map((c, i) => `<button class="btn" data-ev="${i}">${esc(c.t)}</button>`).join('')}</div>`,
+    e => { const b = e.target.closest('[data-ev]'); if (!b) return; const m0 = G.money; const res = ch[+b.dataset.ev].f(); if (G.trip && G.money !== m0) G.trip.log.push([ev.title, Math.round(G.money - m0)]);
+      modal(`<h3>${esc(ev.title)}</h3><div class="t">${esc(res)}</div><div class="ch"><button class="btn go" data-ok>Carry on</button></div>`,
+        e2 => { if (e2.target.closest('[data-ok]')){ closeModal(); paused = false; save(); refreshHud(); rerender(); } });
+      refreshHud(); });
+}
+
+// =====================================================================================
+//  pixel art: sprites drawn in code, outlined
+// =====================================================================================
+function mk(w, h, fn){ const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); fn && fn(g); return c; }
+function P(g, col, x, y, w = 1, h = 1){ g.fillStyle = col; g.fillRect(x, y, w, h); }
+function disc(g, cx, cy, r, col){ g.fillStyle = col; for (let y = -r; y <= r; y++){ const w = Math.floor(Math.sqrt(r * r - y * y + r * .6)); g.fillRect(cx - w, cy + y, w * 2 + 1, 1); } }
+function outlined(src, col = '#24150f'){
+  return mk(src.width + 2, src.height + 2, g => {
+    const s = mk(src.width, src.height, h => { h.drawImage(src, 0, 0); h.globalCompositeOperation = 'source-in'; h.fillStyle = col; h.fillRect(0, 0, src.width, src.height); });
+    for (const [dx, dy] of [[0,1],[2,1],[1,0],[1,2]]) g.drawImage(s, dx, dy);
+    g.drawImage(src, 1, 1);
+  });
+}
+const OUT = '#24150f';
+
+// ---- locomotive (faces right) ----
+function locoSprite(L){
+  const body = L.col, trim = L.trim, dark = shade(body, -.35), hi = shade(body, .3);
+  return outlined(mk(78, 36, g => {
+    // cab
+    P(g, shade('#b8322f', 0), 3, 7, 19, 26); P(g, '#d0483f', 3, 7, 2, 26); P(g, '#8e2622', 20, 7, 2, 26);
+    P(g, '#3a2a2a', 1, 3, 23, 5); P(g, '#5a4444', 1, 3, 23, 1);
+    P(g, '#5a1f1d', 7, 11, 11, 9); P(g, '#ffe39a', 8, 12, 9, 7); P(g, '#fff6cf', 8, 12, 4, 2);
+    P(g, '#8e2622', 3, 26, 19, 1);
+    // boiler
+    P(g, body, 22, 15, 42, 17); P(g, hi, 22, 15, 42, 2); P(g, shade(body, .12), 22, 17, 42, 2); P(g, dark, 22, 29, 42, 3);
+    for (const x of [30, 44, 57]) { P(g, trim, x, 15, 2, 17); P(g, shade(trim, .3), x, 15, 1, 17); }
+    // smokebox front
+    P(g, '#3c3f50', 63, 14, 5, 18); P(g, '#5a5e74', 63, 14, 5, 2);
+    // stack
+    P(g, dark, 54, 8, 5, 8); P(g, body, 55, 8, 2, 8);
+    P(g, dark, 51, 2, 11, 6); P(g, hi, 51, 2, 11, 1); P(g, body, 52, 3, 4, 3);
+    // domes
+    P(g, '#d6a83c', 38, 10, 7, 5); P(g, '#f0c860', 39, 10, 3, 2); P(g, '#a8802a', 38, 14, 7, 1);
+    P(g, dark, 28, 12, 4, 3); P(g, hi, 28, 12, 2, 1);
+    // headlamp
+    P(g, '#3c3f50', 63, 7, 6, 7); P(g, '#ffe680', 67, 8, 2, 5); P(g, '#fffbe0', 68, 9, 1, 2);
+    // running board + cowcatcher
+    P(g, '#7a2420', 18, 31, 54, 2); P(g, '#a8322e', 18, 31, 54, 1);
+    for (let r = 0; r < 4; r++) P(g, r % 2 ? '#7a2420' : '#b8322f', 68, 33 + r, 6 - r + 4 - r, 1);
+    P(g, '#24150f', 69, 33, 1, 3); P(g, '#24150f', 72, 33, 1, 2);
+    // cab steps
+    P(g, '#3a2a2a', 14, 33, 6, 1);
+  }));
+}
+function shade(hex, a){
+  const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = n >> 8 & 255, b = n & 255;
+  if (a > 0){ r += (255 - r) * a; g += (255 - g) * a; b += (255 - b) * a; } else { r *= 1 + a; g *= 1 + a; b *= 1 + a; }
+  return '#' + [r, g, b].map(v => Math.round(clamp(v, 0, 255)).toString(16).padStart(2, '0')).join('');
+}
+const CAR_W = 60, CAR_H = 30;
+function carSprite(type, night){
+  return outlined(mk(CAR_W, CAR_H, g => {
+    const win = night ? '#ffd86b' : '#cfe8f5', winHi = night ? '#fff2b8' : '#eef8fd';
+    if (type === 'freight' || type === 'smug'){
+      const b = type === 'smug' ? '#5e4a3a' : '#8a5a34';
+      P(g, b, 1, 12, 58, 14); P(g, shade(b, .25), 1, 12, 58, 2); P(g, shade(b, -.3), 1, 24, 58, 2);
+      for (let x = 6; x < 58; x += 7) P(g, shade(b, -.2), x, 14, 1, 10);
+      P(g, '#3a2a1f', 0, 26, 60, 2);
+      if (type === 'smug'){ P(g, '#3d3128', 24, 15, 12, 8); P(g, '#c9a24a', 29, 18, 2, 2); }
+    } else {
+      const C = { coach:['#a8322e', '#d9b25b', '#4a1e1c'], luxury:['#2c3e74', '#e8c35a', '#1c2850'], dining:['#2f6d4a', '#e8c35a', '#1d4630'], casino:['#5a2d78', '#ffd166', '#38184c'] }[type];
+      const [b, tr, roof] = C;
+      P(g, b, 1, 6, 58, 21); P(g, shade(b, .22), 1, 6, 58, 2); P(g, shade(b, -.3), 1, 24, 58, 3);
+      P(g, roof, 0, 2, 60, 5); P(g, shade(roof, .35), 2, 2, 56, 1); P(g, roof, 2, 1, 56, 1);
+      P(g, tr, 1, 20, 58, 1);
+      if (type === 'luxury'){ P(g, tr, 1, 8, 58, 1); for (let i = 0; i < 4; i++){ const x = 6 + i * 13; P(g, '#1c2850', x - 1, 10, 11, 9); P(g, win, x, 11, 9, 7); P(g, winHi, x, 11, 3, 2); P(g, '#b8322f', x, 11, 2, 7); P(g, '#b8322f', x + 7, 11, 2, 7); } }
+      else if (type === 'casino'){ for (let i = 0; i < 3; i++){ const x = 8 + i * 17; P(g, roof, x - 1, 10, 10, 8); P(g, win, x, 11, 8, 6); P(g, winHi, x, 11, 3, 2); } for (let x = 4; x < 58; x += 6){ P(g, tr, x, 22, 2, 1); } P(g, tr, 26, 3, 8, 3); }
+      else { for (let i = 0; i < 5; i++){ const x = 5 + i * 10.5 | 0; P(g, roof, x - 1, 10, 8, 8); P(g, win, x, 11, 6, 6); P(g, winHi, x, 11, 2, 2); } if (type === 'dining') for (let i = 0; i < 5; i++) P(g, '#ffd166', 7 + (i * 10.5 | 0), 15, 2, 2); }
+      P(g, '#3a2a1f', 0, 26, 60, 2);
+    }
+  }));
+}
+function stationSprite(roof){
+  return outlined(mk(150, 58, g => {
+    // platform
+    P(g, '#9a9184', 0, 50, 150, 8); P(g, '#c8bfb0', 0, 50, 150, 2); P(g, '#7d7568', 0, 56, 150, 2);
+    for (let x = 4; x < 150; x += 12) P(g, '#8a8275', x, 52, 1, 4);
+    // building
+    P(g, '#e8d5a8', 34, 18, 82, 32); for (let x = 36; x < 116; x += 5) P(g, '#d6c08f', x, 18, 1, 32);
+    P(g, '#c9b182', 34, 46, 82, 4);
+    P(g, '#6b3f22', 70, 30, 12, 20); P(g, '#83512d', 71, 31, 10, 19); P(g, '#f2c14e', 79, 40, 1, 2);
+    for (const x of [42, 54, 90, 102]){ P(g, '#5b3a22', x - 1, 27, 10, 11); P(g, '#9fd3e8', x, 28, 8, 9); P(g, '#d8f0f8', x, 28, 3, 3); P(g, '#5b3a22', x + 4, 28, 1, 9); }
+    // roof with overhang
+    P(g, roof, 26, 8, 98, 11); P(g, shade(roof, .3), 26, 8, 98, 2);
+    for (let x = 26; x < 124; x += 6) P(g, shade(roof, -.2), x, 10, 1, 8);
+    for (let x = 26; x < 124; x += 4) P(g, shade(roof, -.3), x, 18, 3, 2);
+    P(g, shade(roof, -.15), 40, 3, 70, 5); P(g, shade(roof, .2), 40, 3, 70, 1);
+    // sign
+    P(g, '#5a3a22', 58, 0, 34, 7); P(g, '#e8c992', 59, 1, 32, 5);
+    // lamps + bench
+    for (const x of [8, 140]){ P(g, '#2b2d3a', x, 30, 2, 20); P(g, '#2b2d3a', x - 2, 26, 6, 5); P(g, '#ffe680', x - 1, 27, 4, 3); }
+    P(g, '#7a4b2b', 16, 44, 14, 2); P(g, '#5c361e', 17, 46, 2, 4); P(g, '#5c361e', 27, 46, 2, 4); P(g, '#7a4b2b', 16, 40, 14, 2);
+    P(g, '#7a4b2b', 120, 44, 14, 2); P(g, '#5c361e', 121, 46, 2, 4); P(g, '#5c361e', 131, 46, 2, 4); P(g, '#7a4b2b', 120, 40, 14, 2);
+  }));
+}
+// tiny people waiting on the platform
+const SKIN = ['#f1c9a5', '#d9a07a', '#a8714a', '#7a4e2f'], CLOTH = ['#b8322f', '#2f6fb0', '#3f8a3e', '#e8b23a', '#7a4ea8', '#e07a3a', '#4a4a5a'];
+function personSprite(i, rich){
+  const s = SKIN[i % 4], c = rich ? '#2c2c3a' : CLOTH[i % 7], h = ['#3a2416', '#7a4a22', '#d8b060', '#1a1a1a'][i % 4];
+  return outlined(mk(5, 12, g => {
+    P(g, s, 1, 3, 3, 3); P(g, h, 1, 2, 3, 1); P(g, c, 0, 6, 5, 4); P(g, '#3a2a2a', 1, 10, 1, 2); P(g, '#3a2a2a', 3, 10, 1, 2);
+    if (rich){ P(g, '#1a1a1a', 0, 1, 5, 1); P(g, '#1a1a1a', 1, 0, 3, 1); P(g, '#e8c35a', 2, 7, 1, 1); }
+  }));
+}
+
+// ---- UI icons (16 x 16) ----
+function icon(draw){ return outlined(mk(16, 16, draw)).toDataURL(); }
+const ICONS = {
+  market: icon(g => { P(g, '#b07a4a', 1, 6, 14, 9); P(g, '#d39a62', 1, 6, 14, 2); P(g, '#8a5a34', 1, 10, 14, 1); P(g, '#8a5a34', 7, 6, 2, 9); P(g, '#f2c12e', 4, 1, 6, 6); P(g, '#fff09a', 5, 2, 2, 2); P(g, '#c99a12', 9, 2, 1, 4); }),
+  pax: icon(g => { P(g, '#f1c9a5', 3, 2, 4, 4); P(g, '#3a2416', 3, 1, 4, 1); P(g, '#2f6fb0', 2, 6, 6, 6); P(g, '#3a2a2a', 3, 12, 1, 3); P(g, '#3a2a2a', 6, 12, 1, 3);
+    P(g, '#d9a07a', 9, 3, 4, 4); P(g, '#1a1a1a', 8, 1, 6, 2); P(g, '#b8322f', 8, 7, 6, 6); P(g, '#3a2a2a', 9, 13, 1, 2); P(g, '#3a2a2a', 12, 13, 1, 2); }),
+  con: icon(g => { P(g, '#f4e4c1', 3, 2, 10, 12); P(g, '#e0c48e', 3, 2, 10, 2); P(g, '#e0c48e', 3, 12, 10, 2); for (let y = 5; y < 11; y += 2) P(g, '#8a6a4a', 5, y, 6, 1); P(g, '#b8322f', 10, 10, 4, 4); P(g, '#e05a4a', 11, 11, 1, 1); }),
+  map: icon(g => { P(g, '#e8d29a', 1, 2, 14, 12); P(g, '#d4b878', 6, 2, 4, 12); P(g, '#7ab0d8', 2, 4, 3, 3); P(g, '#6aa84f', 10, 8, 4, 4); P(g, '#b8322f', 7, 5, 2, 2); P(g, '#8a5a34', 3, 10, 6, 1); P(g, '#8a5a34', 8, 7, 1, 4); }),
+  train: icon(g => { P(g, '#b8322f', 1, 3, 5, 8); P(g, '#3a2a2a', 0, 2, 7, 2); P(g, '#ffe39a', 2, 5, 3, 3); P(g, '#2b2d3a', 6, 6, 8, 5); P(g, '#4a4e63', 6, 6, 8, 1); P(g, '#2b2d3a', 11, 2, 3, 4); P(g, '#2b2d3a', 10, 1, 5, 2);
+    P(g, '#d6a83c', 8, 5, 2, 1); P(g, '#24150f', 3, 11, 3, 3); P(g, '#24150f', 8, 11, 3, 3); P(g, '#8a8f99', 4, 12, 1, 1); P(g, '#8a8f99', 9, 12, 1, 1); P(g, '#b8322f', 13, 11, 2, 2); }),
+  crew: icon(g => { P(g, '#2f4a73', 2, 3, 12, 3); P(g, '#1c2c48', 1, 6, 14, 2); P(g, '#e8c35a', 7, 4, 2, 2); P(g, '#f1c9a5', 4, 8, 8, 6); P(g, '#24150f', 6, 10, 1, 1); P(g, '#24150f', 9, 10, 1, 1); P(g, '#7a4a22', 4, 13, 8, 2); }),
+  bank: icon(g => { P(g, '#c9a46a', 3, 5, 10, 10); P(g, '#e6c58c', 3, 5, 10, 2); P(g, '#a07a42', 5, 2, 6, 3); P(g, '#8a5a34', 6, 4, 4, 1); P(g, '#3f8a3e', 6, 8, 4, 5); P(g, '#8fd16a', 7, 8, 1, 5); P(g, '#3f8a3e', 5, 9, 6, 1); P(g, '#3f8a3e', 5, 11, 6, 1); }),
+  gear: icon(g => { disc(g, 8, 8, 6, '#8a8f99'); for (const [x, y] of [[7,0],[7,14],[0,7],[14,7],[2,2],[12,2],[2,12],[12,12]]) P(g, '#8a8f99', x, y, 2, 2); disc(g, 8, 8, 3, '#5a5e6a'); disc(g, 8, 8, 1, '#c9ccd4'); P(g, '#b9bdc6', 4, 4, 3, 1); }),
+  coin: icon(g => { disc(g, 8, 8, 6, '#e8b23a'); disc(g, 8, 8, 4, '#f6cf5a'); P(g, '#c98f1a', 7, 4, 2, 8); P(g, '#fff0a8', 5, 5, 2, 2); }),
+};
+function goodIcon(id){
+  const gd = GOOD[id];
+  return outlined(mk(12, 12, g => {
+    const c = gd.col, h = gd.hi;
+    switch (id){
+      case 'coal': disc(g, 4, 8, 3, c); disc(g, 8, 7, 3, c); disc(g, 6, 4, 2, c); P(g, h, 3, 6, 2, 1); P(g, h, 7, 5, 2, 1); break;
+      case 'grain': for (let i = 0; i < 4; i++){ P(g, '#b8902f', 3 + i * 2, 5, 1, 7); P(g, c, 2 + i * 2, 1, 3, 5); P(g, h, 3 + i * 2, 1, 1, 3); } P(g, '#8a5a34', 2, 8, 9, 1); break;
+      case 'oranges': disc(g, 6, 7, 4, c); P(g, h, 4, 4, 2, 2); P(g, '#3f8a3e', 6, 1, 3, 2); P(g, '#6a4a2a', 6, 2, 1, 2); break;
+      case 'lumber': for (let i = 0; i < 3; i++){ P(g, c, 0, 2 + i * 3, 12, 3); P(g, h, 0, 2 + i * 3, 12, 1); disc(g, 10, 3 + i * 3, 1, '#e8c38a'); } break;
+      case 'iron': P(g, c, 1, 5, 10, 5); P(g, h, 2, 4, 8, 2); P(g, shade(c, -.3), 1, 9, 10, 1); break;
+      case 'cotton': disc(g, 4, 5, 3, c); disc(g, 8, 5, 3, c); disc(g, 6, 3, 3, c); P(g, '#7a5a3a', 5, 8, 2, 4); P(g, '#ddd8c8', 4, 6, 4, 1); break;
+      case 'whiskey': P(g, c, 3, 4, 6, 8); P(g, h, 4, 5, 1, 6); P(g, c, 5, 1, 2, 3); P(g, '#e8d5a8', 3, 7, 6, 3); P(g, '#5a3a22', 5, 0, 2, 1); break;
+      case 'cattle': P(g, c, 2, 3, 8, 7); P(g, '#f2efe6', 4, 6, 4, 4); P(g, '#e8d5a8', 0, 2, 2, 2); P(g, '#e8d5a8', 10, 2, 2, 2); P(g, '#24150f', 4, 5, 1, 1); P(g, '#24150f', 7, 5, 1, 1); P(g, '#f0a8a0', 5, 8, 2, 1); break;
+      case 'gold': disc(g, 6, 7, 4, '#8a7a6a'); P(g, c, 3, 5, 3, 3); P(g, c, 7, 7, 3, 2); P(g, h, 4, 5, 1, 1); P(g, h, 8, 7, 1, 1); break;
+      case 'luxury': P(g, '#5a3a22', 1, 5, 10, 6); P(g, '#8a5a34', 1, 5, 10, 1); P(g, c, 4, 1, 4, 4); P(g, h, 5, 1, 1, 2); P(g, '#e8c35a', 1, 7, 10, 1); break;
+      case 'moon': P(g, '#c9a46a', 3, 3, 6, 9); P(g, c, 4, 5, 4, 5); P(g, h, 4, 5, 1, 4); P(g, '#7a5a3a', 4, 1, 4, 2); P(g, '#24150f', 4, 7, 4, 1); break;
+    }
+  })).toDataURL();
+}
+const GICON = {}; [...GOODS, CONTRA].forEach(g => GICON[g.id] = goodIcon(g.id));
+const gImg = id => `<img class="px" src="${GICON[id]}" alt="">`;
+
+// =====================================================================================
+//  scenery: parallax strips per biome
+// =====================================================================================
+const BIOMES = {
+  plains: { sky:['#7fc4ec','#96d0f0','#aedbf3','#c7e6f6','#ddf0f8'], far:['#9fb3d6','#8a9fc6'], cap:null, hill:['#86bf62','#6aa84f'], ground:'#78b552', groundD:'#5f9a43', trees:'round', treeC:['#3f8a3e','#2f6b34','#5aa848'] },
+  forest: { sky:['#7ab8e0','#8fc4e6','#a6d0ec','#bedcf0','#d4e8f4'], far:['#8aa0c4','#7489b2'], cap:'#e8eef7', hill:['#4f8f55','#3a7444'], ground:'#4f8f45', groundD:'#3f7438', trees:'pine', treeC:['#2f5e3a','#22482c','#3f7a4a'] },
+  snow:   { sky:['#8eaee6','#a2bdec','#b6cbf0','#cbdaf4','#e0e9f8'], far:['#c9d6ee','#a8b8d8'], cap:'#ffffff', hill:['#e4ecf7','#c9d6ea'], ground:'#eef3fb', groundD:'#d2dcec', trees:'snowpine', treeC:['#2f5a4a','#22443a','#ffffff'] },
+  desert: { sky:['#f0b97c','#f4c78f','#f8d6a6','#fbe3bd','#fdeed5'], far:['#d99a68','#c4825a'], cap:null, hill:['#e8b070','#d6955a'], ground:'#e9c27d', groundD:'#d4a862', trees:'cactus', treeC:['#5a9a4a','#3f7a3a','#7ab85a'] },
+  coast:  { sky:['#78c0ec','#8ecaef','#a6d6f2','#c0e2f6','#daeefa'], far:['#a6bcd8','#90a8cc'], cap:null, hill:['#3b8fc7','#2f78b0'], sea:true, ground:'#e6cf96', groundD:'#d2b878', trees:'palm', treeC:['#3f8a3e','#2f6b34','#8a5a34'] },
+  city:   { sky:['#88a8d8','#9ab6de','#aec4e4','#c2d2ea','#d8e2f0'], far:['#9aa6c4','#8592b4'], cap:null, hill:['#7a86a4','#68738f'], ground:'#9a9ea8', groundD:'#80848e', trees:'city', treeC:['#5a6478','#4a5266','#ffe39a'] },
+};
+const STRIP_W = 640;
+let strips = {};          // biome -> {far, hill, trees, near}
+function hash(n){ n = (n << 13) ^ n; return ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 0x7fffffff; }
+function makeStrips(biome, H, horizon){
+  const B = BIOMES[biome], r = mulberry(biome.length * 977 + biome.charCodeAt(0));
+  const far = mk(STRIP_W, H, g => {          // mountains / mesas
+    const n = 7;
+    for (let i = 0; i < n; i++){
+      const cx = i * STRIP_W / n + r() * 40, h = (biome === 'desert' ? 34 : 46) + r() * 26, w = 60 + r() * 50;
+      for (let dx = -w; dx <= w; dx++){
+        let top;
+        if (biome === 'desert'){ const e = Math.abs(dx) / w; top = horizon - h * (e < .6 ? .75 : (1 - e) / .4 * .75); }
+        else top = horizon - h * (1 - Math.abs(dx) / w) - (hash(i * 100 + dx) > .7 ? 1 : 0);
+        const col = dx < 0 ? B.far[0] : B.far[1];
+        for (const X of [cx + dx, cx + dx - STRIP_W, cx + dx + STRIP_W]){
+          const x = Math.round(X); if (x < 0 || x >= STRIP_W) continue;
+          P(g, col, x, Math.round(top), 1, horizon - Math.round(top));
+          if (B.cap && biome !== 'desert' && horizon - top > h * .62) P(g, dx < 0 ? B.cap : shade(B.cap, -.12), x, Math.round(top), 1, Math.max(2, Math.round((horizon - top) - h * .62)));
+          if (biome === 'desert'){ P(g, shade(col, -.12), x, Math.round(top) + 6, 1, 2); P(g, shade(col, -.12), x, Math.round(top) + 14, 1, 2); }
+        }
+      }
+    }
+  });
+  const hill = mk(STRIP_W, H, g => {         // rolling hills, or the sea
+    if (B.sea){
+      P(g, B.hill[1], 0, horizon - 14, STRIP_W, 14); P(g, B.hill[0], 0, horizon - 14, STRIP_W, 3);
+      for (let i = 0; i < 70; i++) P(g, '#cfe9f7', Math.floor(r() * STRIP_W), horizon - 13 + Math.floor(r() * 12), 2 + Math.floor(r() * 4), 1);
+      return;
+    }
+    for (let x = 0; x < STRIP_W; x++){
+      const t = x / STRIP_W * Math.PI * 2;
+      const y = horizon - 10 - 6 * Math.sin(t * 3 + 1) - 4 * Math.sin(t * 5 + 2) - 3 * Math.sin(t * 9);
+      P(g, B.hill[0], x, Math.round(y), 1, horizon - Math.round(y)); P(g, shade(B.hill[0], .18), x, Math.round(y), 1, 1);
+      if ((x + Math.round(y)) % 9 === 0) P(g, B.hill[1], x, Math.round(y) + 3, 2, 1);
+    }
+  });
+  const trees = mk(STRIP_W, H, g => {        // tree line along the horizon
+    const C = B.treeC;
+    let x = 4;
+    while (x < STRIP_W - 10){
+      const s = .7 + r() * .6;
+      if (B.trees === 'round'){ const R0 = Math.round(6 * s); const t = outlined(mk(R0 * 2 + 3, R0 * 2 + 8, h => { P(h, '#6a4a2a', R0, R0 + 2, 2, 7); disc(h, R0 + 1, R0 + 1, R0, C[1]); disc(h, R0, R0, R0 - 1, C[0]); disc(h, R0 - 2, R0 - 2, Math.max(1, R0 - 4), C[2]); }), OUT);
+        g.drawImage(t, x, horizon - t.height + 2); x += t.width + Math.floor(r() * 14); }
+      else if (B.trees === 'pine' || B.trees === 'snowpine'){ const hh = Math.round(16 * s) + 6, w = Math.round(hh * .55);
+        const t = outlined(mk(w, hh, h => { P(h, '#5a3a22', (w >> 1) - 1, hh - 3, 2, 3); for (let y = 0; y < hh - 3; y++){ const ww = Math.max(1, Math.round((y % 6 + y / (hh - 3) * 6) / 12 * w)); P(h, C[0], (w >> 1) - (ww >> 1), y, ww, 1); P(h, C[1], (w >> 1), y, ww - (ww >> 1), 1); if (B.trees === 'snowpine' && y % 6 < 2) P(h, C[2], (w >> 1) - (ww >> 1), y, ww, 1); } }), OUT);
+        g.drawImage(t, x, horizon - t.height + 1); x += Math.floor(w * .7) + Math.floor(r() * 6); }
+      else if (B.trees === 'cactus'){ if (r() < .5){ const hh = Math.round(12 * s) + 4; const t = outlined(mk(9, hh, h => { P(h, C[0], 3, 0, 3, hh); P(h, C[2], 3, 0, 1, hh); P(h, C[0], 0, 4, 2, 4); P(h, C[0], 0, 7, 3, 1); P(h, C[0], 7, 2, 2, 4); P(h, C[0], 6, 5, 2, 1); }), OUT); g.drawImage(t, x, horizon - t.height + 1); }
+        else { const t = outlined(mk(8, 4, h => { P(h, '#b88a5a', 0, 1, 8, 3); P(h, '#d4a878', 1, 0, 5, 1); }), OUT); g.drawImage(t, x, horizon - 4); } x += 18 + Math.floor(r() * 30); }
+      else if (B.trees === 'palm'){ const hh = Math.round(14 * s) + 6; const t = outlined(mk(15, hh, h => { for (let y = 3; y < hh; y++) P(h, C[2], 7 + Math.round(Math.sin(y / 5) * 1.5), y, 2, 1); P(h, C[0], 1, 1, 13, 2); P(h, C[0], 0, 3, 4, 2); P(h, C[0], 11, 3, 4, 2); P(h, C[1], 4, 0, 7, 1); P(h, '#8a5a34', 7, 3, 2, 2); }), OUT); g.drawImage(t, x, horizon - t.height + 1); x += 22 + Math.floor(r() * 30); }
+      else if (B.trees === 'city'){ const w = 14 + Math.floor(r() * 18), hh = 14 + Math.floor(r() * 26); const t = outlined(mk(w, hh, h => { P(h, C[r() < .5 ? 0 : 1], 0, 0, w, hh); P(h, shade(C[0], .2), 0, 0, w, 1); for (let yy = 3; yy < hh - 2; yy += 5) for (let xx = 2; xx < w - 2; xx += 4) if (r() < .7) P(h, r() < .35 ? C[2] : shade(C[0], -.25), xx, yy, 2, 2); }), OUT); g.drawImage(t, x, horizon - t.height + 1); x += w + Math.floor(r() * 3); }
+    }
+  });
+  return { far, hill, trees };
+}
+
+// =====================================================================================
+//  the scene: canvas, camera, train, smoke, station
+// =====================================================================================
+const cv = $('#scene'), ctx = cv.getContext('2d');
+let K = 1, BW = 320, BH = 180, buf = null, bx = null, horizon = 120, trackY = 140;
+let paused = false;
+const V = {                                        // visual state (not saved)
+  x:0, v:0, target:0, station:null, stationTown:null, decel:null, accel:0, smoke:[], snow:[], biome:'plains', prevBiome:null, fade:1, float:[], arriveAt:0,
+  depart(){ this.accel = 2.2; this.decel = null; },
+  arrive(town){ this.decel = null; this.v = 0; this.stationTown = town; this.placeStation(); setBiome(TOWN[town].biome); },
+  placeStation(){ this.station = this.x + trainFront() - trainLen() / 2 - 75; },
+};
+const CRUISE = 64;
+function trainFront(){ return Math.round(BW * .7); }
+function trainLen(){ return 78 + G.train.cars.length * (CAR_W + 3); }
+let sprites = { loco:null, cars:{}, carsN:{}, station:{}, people:[] };
+function buildSprites(){
+  sprites.loco = locoSprite(loco());
+  for (const t of Object.keys(CARS)){ sprites.cars[t] = carSprite(t, false); sprites.carsN[t] = carSprite(t, true); }
+  for (const t of TOWNS) sprites.station[t.id] = stationSprite(t.roof);
+  sprites.people = Array.from({ length:12 }, (_, i) => personSprite(i, i % 5 === 4));
+}
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
+  cv.width = W; cv.height = H;
+  K = Math.max(1, Math.round(H / 160));
+  BW = Math.ceil(W / K); BH = Math.ceil(H / K);
+  buf = mk(BW, BH); bx = buf.getContext('2d');
+  const barGame = (64 * dpr) / K;
+  trackY = Math.round(BH - barGame - 10);
+  horizon = trackY - 16;
+  strips = {};
+  if (G && V.stationTown) V.placeStation();
+}
+function getStrips(b){ return strips[b] || (strips[b] = makeStrips(b, BH, horizon)); }
+function setBiome(b){ if (b === V.biome) return; V.prevBiome = V.biome; V.biome = b; V.fade = 0; }
+
+// time of day: 0 = morning, .25 noon, .5 dusk, .75 night
+function lightAt(tod){
+  // returns [tintColor, alpha, nightness]
+  const k = (tod % 1 + 1) % 1;
+  if (k < .08) return ['#ff9a6a', .18 * (1 - k / .08), 0];
+  if (k < .42) return ['#000000', 0, 0];
+  if (k < .55){ const t = (k - .42) / .13; return ['#ff7a3a', .22 * t, t * .2]; }
+  if (k < .62){ const t = (k - .55) / .07; return ['#24305e', .22 + .3 * t, .2 + .8 * t]; }
+  if (k < .92) return ['#1a2450', .52, 1];
+  const t = (k - .92) / .08; return ['#4a3a6a', .52 - .3 * t, 1 - t];
+}
+
+function update(dt){
+  // trip clock
+  if (G.trip && !paused){
+    const T = G.trip;
+    T.el += dt;
+    const BR = Math.min(2.6, segTime() * .85);
+    if (T.seg === T.segs - 1 && !V.decel && T.el >= segTime() - BR){       // start braking into the station
+      const D = BR, dist = V.v * D / 2;
+      V.station = V.x + dist + trainFront() - trainLen() / 2 - 75; V.stationTown = T.to; V.decel = { t:0, D, v0:V.v };
+    }
+    const legB = T.legs[Math.min(T.seg, T.legs.length - 1)];
+    setBiome(V.decel ? TOWN[T.to].biome : legB);
+    if (T.el >= segTime()) segmentDone();
+  }
+  // speed
+  if (V.decel){ V.decel.t += dt; V.v = Math.max(0, V.decel.v0 * (1 - V.decel.t / V.decel.D)); if (V.decel.t >= V.decel.D) V.v = 0; }
+  else if (G.trip){
+    const target = paused ? CRUISE * .35 : CRUISE * (.8 + .2 * loco().speed);
+    V.v += (target - V.v) * Math.min(1, dt * (V.accel > 0 ? .9 : 1.5)); V.accel = Math.max(0, V.accel - dt);
+  } else V.v = 0;
+  V.x += V.v * dt;
+  if (V.station !== null && V.station - V.x < -400 && G.trip && !V.decel) { V.station = null; V.stationTown = null; }
+  V.fade = Math.min(1, V.fade + dt / 1.6);
+  // visual time of day glides between segments
+  // smoke
+  V.smokeT = (V.smokeT || 0) - dt;
+  if (V.smokeT <= 0){
+    V.smokeT = V.v > 5 ? .09 : .45;
+    const fx = trainFront() - 22, fy = trackY - 36;
+    V.smoke.push({ x:fx + V.x, y:fy, r:1.5, vx:-(V.v * .15) + (Math.random() - .5) * 4, vy:-(V.v > 5 ? 10 : 6) - Math.random() * 4, life:0, max:V.v > 5 ? 2.2 : 3 });
+  }
+  for (const s of V.smoke){ s.life += dt; s.x += s.vx * dt; s.y += s.vy * dt; s.vy *= 1 - dt * .6; s.r = 1.5 + s.life * 3.2; }
+  V.smoke = V.smoke.filter(s => s.life < s.max);
+  // snow
+  if (V.biome === 'snow' && V.snow.length < 70) V.snow.push({ x:Math.random() * BW, y:-2, vy:8 + Math.random() * 10, ph:Math.random() * 6 });
+  for (const s of V.snow){ s.y += s.vy * dt; s.x += (Math.sin(s.ph + s.y / 12) * 6 - V.v * .4) * dt; if (s.x < 0) s.x += BW; }
+  V.snow = V.snow.filter(s => s.y < trackY + 10 && (V.biome === 'snow' || s.y > 0));
+  for (const f of V.float){ f.t += dt; }
+  V.float = V.float.filter(f => f.t < 1.6);
+}
+
+function drawLayer(img, factor, alpha){
+  if (!img) return;
+  let off = -((V.x * factor) % STRIP_W); if (off > 0) off -= STRIP_W;
+  bx.globalAlpha = alpha;
+  for (let x = Math.round(off); x < BW; x += STRIP_W) bx.drawImage(img, x, 0);
+  bx.globalAlpha = 1;
+}
+function drawScene(){
+  const tod = G.trip ? (G.tod + G.trip.el / segTime() * .25) % 1 : G.tod;
+  const [tint, ta, night] = lightAt(tod);
+  const B = BIOMES[V.biome], PB = V.prevBiome ? BIOMES[V.prevBiome] : B, f = V.fade;
+  // sky bands
+  const bands = B.sky.length, top = 0, bh = Math.ceil(horizon / bands);
+  for (let i = 0; i < bands; i++){ bx.fillStyle = f < 1 ? mix(PB.sky[i], B.sky[i], f) : B.sky[i]; bx.fillRect(0, top + i * bh, BW, bh + 1); }
+  // stars + sun/moon
+  if (night > .3){ bx.fillStyle = `rgba(255,255,240,${(night - .3) * 1.2})`; for (let i = 0; i < 40; i++){ const sx = (hash(i * 7) * BW * 1.3 - V.x * .02) % BW, sy = hash(i * 13) * horizon * .6; bx.fillRect((sx + BW) % BW | 0, sy | 0, 1, 1); } }
+  const sunA = ((tod + .1) % 1) / .62;                       // sun arcs across between morning and dusk
+  if (sunA <= 1){ const sx = BW * (.1 + .8 * sunA), sy = horizon * (.7 - .55 * Math.sin(sunA * Math.PI)); disc(bx, sx | 0, sy | 0, 7, '#fff3c0'); disc(bx, sx | 0, sy | 0, 5, '#ffe680'); }
+  else { const mA = ((tod - .52 + 1) % 1) / .48; const mx = BW * (.1 + .8 * mA), my = horizon * (.7 - .5 * Math.sin(mA * Math.PI)); disc(bx, mx | 0, my | 0, 5, '#eef2ff'); disc(bx, (mx | 0) + 2, (my | 0) - 1, 4, mix(B.sky[0], '#1a2450', .5)); }
+  // clouds
+  for (let i = 0; i < 5; i++){ const cx = ((hash(i + 3) * BW * 2 - V.x * .04 - performance.now() / 1000 * 2) % (BW + 80) + BW + 80) % (BW + 80) - 40, cy = 14 + hash(i + 9) * horizon * .35;
+    bx.fillStyle = night > .5 ? '#8a94b8' : '#ffffff'; bx.fillRect(cx | 0, cy | 0, 26, 4); bx.fillRect((cx + 5) | 0, (cy - 3) | 0, 14, 4); bx.fillStyle = night > .5 ? '#6a7498' : '#e2eef8'; bx.fillRect((cx + 2) | 0, (cy + 3) | 0, 24, 2); }
+  // parallax layers (cross-fade when the land changes)
+  const S = getStrips(V.biome), PS = V.prevBiome && f < 1 ? getStrips(V.prevBiome) : null;
+  if (PS){ drawLayer(PS.far, .08, 1 - f); drawLayer(PS.hill, .2, 1 - f); drawLayer(PS.trees, .42, 1 - f); }
+  drawLayer(S.far, .08, PS ? f : 1); drawLayer(S.hill, .2, PS ? f : 1); drawLayer(S.trees, .42, PS ? f : 1);
+  // ground
+  const gc = f < 1 ? mix(PB.ground, B.ground, f) : B.ground, gd = f < 1 ? mix(PB.groundD, B.groundD, f) : B.groundD;
+  bx.fillStyle = gc; bx.fillRect(0, horizon, BW, BH - horizon);
+  bx.fillStyle = gd; for (let i = 0; i < 60; i++){ const gx = ((hash(i * 31) * 900 - V.x) % 900 + 900) % 900; if (gx < BW) bx.fillRect(gx | 0, horizon + 2 + (hash(i * 17) * (trackY - horizon - 4) | 0), 3, 1); }
+  // telegraph poles + wires
+  const PG = 150, p0 = -((V.x) % PG);
+  bx.fillStyle = '#4a3a2a';
+  for (let x = p0 - PG; x < BW + PG; x += PG){ const X = Math.round(x); bx.fillRect(X, horizon - 30, 2, 30 + 6); bx.fillRect(X - 4, horizon - 28, 10, 2);
+    bx.fillStyle = '#3a3a3a'; for (let i = 0; i <= PG; i += 3){ const sag = Math.sin(i / PG * Math.PI) * 6; bx.fillRect(X + i, Math.round(horizon - 27 + sag), 1, 1); } bx.fillStyle = '#4a3a2a'; }
+  // station
+  if (V.station !== null){
+    const sx = Math.round(V.station - V.x), sp = sprites.station[V.stationTown];
+    if (sx > -200 && sx < BW + 50){
+      bx.drawImage(sp, sx, trackY - sp.height + 2);
+      if (G.town === V.stationTown){       // people waiting
+        const o = G.offers[G.town]; let n = 0; const want = Math.min(10, o.pax.reduce((s, p) => s + Math.ceil(p.n / 2), 0));
+        for (let i = 0; i < want; i++){ const p = sprites.people[(i + G.town.length) % 12]; const px0 = sx + 20 + ((i * 37) % 112) + (i > 5 ? 6 : 0); bx.drawImage(p, px0, trackY - 20 - (Math.sin(performance.now() / 300 + i) > .9 ? 1 : 0)); n++; }
+      }
+    }
+  }
+  // track
+  bx.fillStyle = '#7d7064'; bx.fillRect(0, trackY + 1, BW, 6); bx.fillStyle = '#968a7c'; bx.fillRect(0, trackY + 1, BW, 1);
+  for (let i = 0; i < 40; i++){ const gx = ((hash(i * 53) * 400 - V.x) % 400 + 400) % 400; if (gx < BW) { bx.fillStyle = '#5e544a'; bx.fillRect(gx | 0, trackY + 3 + (i % 3), 2, 1); } }
+  const sl = -((V.x) % 8);
+  bx.fillStyle = '#5a3a24'; for (let x = sl - 8; x < BW; x += 8) bx.fillRect(Math.round(x), trackY + 1, 5, 3);
+  bx.fillStyle = '#4a4e58'; bx.fillRect(0, trackY - 1, BW, 2); bx.fillStyle = '#b9bdc6'; bx.fillRect(0, trackY - 1, BW, 1);
+  // train
+  drawTrain(night);
+  // smoke above train
+  for (const s of V.smoke){ const a = 1 - s.life / s.max, x = Math.round(s.x - V.x), y = Math.round(s.y), r = Math.round(s.r);
+    bx.globalAlpha = Math.min(1, a * 1.4); disc(bx, x, y, r, night > .5 ? '#8a8fa8' : '#ececf2'); disc(bx, x - 1, y - 1, Math.max(1, r - 2), night > .5 ? '#a8adc4' : '#ffffff'); bx.globalAlpha = 1; }
+  // foreground bushes (fast parallax)
+  // night tint, then the lights on top of it
+  if (ta > 0){ bx.globalAlpha = ta; bx.fillStyle = tint; bx.fillRect(0, 0, BW, BH); bx.globalAlpha = 1; }
+  if (night > .3) drawLights(night);
+  // snow
+  if (V.biome === 'snow' || V.snow.length){ bx.fillStyle = '#ffffff'; for (const s of V.snow) bx.fillRect(s.x | 0, s.y | 0, 1, 1); }
+  // floating money
+  bx.font = `bold 8px Silkscreen, monospace`; bx.textAlign = 'center';
+  for (const fl of V.float){ bx.globalAlpha = 1 - fl.t / 1.6; bx.fillStyle = '#24150f'; bx.fillText(fl.txt, fl.x + 1, fl.y - fl.t * 14 + 1); bx.fillStyle = fl.col; bx.fillText(fl.txt, fl.x, fl.y - fl.t * 14); }
+  bx.globalAlpha = 1;
+  // blit
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(buf, 0, 0, BW * K, BH * K);
+}
+function drawTrain(night){
+  const front = trainFront(), base = trackY - 1, bob = V.v > 5 ? (Math.floor(V.x / 9) % 2) : 0;
+  const L = sprites.loco, lx = front - L.width;
+  let x = lx;
+  // cars (behind the loco, to the left)
+  const order = G.train.cars;
+  for (let i = 0; i < order.length; i++){
+    const type = order[i], sp = (night > .5 ? sprites.carsN : sprites.cars)[type];
+    x -= CAR_W + 3;
+    const y = base - sp.height - 4 + ((bob + i) % 2 && V.v > 5 ? 1 : 0);
+    bx.fillStyle = '#24150f'; bx.fillRect(x + CAR_W, y + 22, 5, 2);                 // coupler
+    if (type === 'freight') drawCargo(x, y, i);
+    bx.drawImage(sp, x, y);
+    for (const wx of [10, 19, 40, 49]) wheel(x + wx, base - 3, 3, (V.x / 3) + wx);
+    if (night > .5 && type !== 'freight' && type !== 'smug') { /* windows glow drawn in drawLights */ }
+  }
+  // loco
+  const ly = base - L.height - 4 + bob;
+  bx.drawImage(L, lx, ly);
+  const ang = V.x / 6;
+  wheel(lx + 13, base - 3, 3, ang); wheel(lx + 63, base - 3, 3, ang);
+  wheel(lx + 32, base - 6, 6, ang); wheel(lx + 47, base - 6, 6, ang);
+  // side rod
+  const rx = Math.cos(ang) * 3, ry = Math.sin(ang) * 3;
+  bx.fillStyle = '#c9ccd4'; const a1 = lx + 32 + rx, a2 = lx + 47 + rx, yy = Math.round(base - 6 + ry);
+  bx.fillRect(Math.round(a1), yy, Math.round(a2 - a1) + 1, 2); bx.fillStyle = '#8a8f99'; bx.fillRect(Math.round(a1), yy + 1, Math.round(a2 - a1) + 1, 1);
+}
+function drawCargo(x, y, idx){
+  // cargo heaps show what you are carrying, spread over the freight cars
+  const freightIdx = G.train.cars.slice(0, idx).filter(c => c === 'freight').length;
+  const goods = Object.entries(G.cargo).filter(([g, q]) => q > 0 && g !== 'moon');
+  let units = []; for (const [g, q] of goods) for (let i = 0; i < q; i++) units.push(g);
+  const mine = units.slice(freightIdx * 10, freightIdx * 10 + 10);
+  if (!mine.length) return;
+  for (let i = 0; i < mine.length; i++){
+    const gd = GOOD[mine[i]], cx = x + 6 + i * 5;
+    const hgt = 3 + ((i * 7) % 3);
+    bx.fillStyle = '#24150f'; bx.fillRect(cx - 1, y + 13 - hgt - 1, 7, hgt + 2);
+    bx.fillStyle = gd.col; bx.fillRect(cx, y + 13 - hgt, 5, hgt + 1);
+    bx.fillStyle = gd.hi; bx.fillRect(cx + 1, y + 13 - hgt, 2, 1);
+  }
+}
+function wheel(cx, cy, r, ang){
+  cx = Math.round(cx); cy = Math.round(cy);
+  disc(bx, cx, cy, r + 1, '#24150f'); disc(bx, cx, cy, r, '#3a3d4a');
+  if (r > 3) disc(bx, cx, cy, r - 2, '#2b2d3a');
+  bx.fillStyle = '#9aa0ab';
+  for (let k = 0; k < 2; k++){ const a = ang + k * Math.PI / 2; for (let t = -r + 1; t <= r - 1; t++) bx.fillRect(Math.round(cx + Math.cos(a) * t), Math.round(cy + Math.sin(a) * t), 1, 1); }
+  bx.fillStyle = '#b8322f'; bx.fillRect(cx - (r > 3 ? 1 : 0), cy - (r > 3 ? 1 : 0), r > 3 ? 2 : 1, r > 3 ? 2 : 1);
+}
+function drawLights(night){
+  bx.globalCompositeOperation = 'lighter';
+  const a = Math.min(1, (night - .3) * 1.5);
+  // headlamp beam
+  const front = trainFront(), ly = trackY - 32;
+  for (let i = 0; i < 46; i++){ bx.fillStyle = `rgba(255,220,120,${a * .32 * (1 - i / 46)})`; bx.fillRect(front + i, ly - i * .25, 1, 3 + i * .5); }
+  // car windows
+  let x = front - sprites.loco.width;
+  bx.fillStyle = `rgba(255,190,90,${a * .35})`;
+  for (const type of G.train.cars){ x -= CAR_W + 3; if (type !== 'freight' && type !== 'smug') bx.fillRect(x + 2, trackY - 26, CAR_W - 2, 12); }
+  bx.fillRect(front - sprites.loco.width + 6, trackY - 31, 13, 11);
+  // station lamps
+  if (V.station !== null){ const sx = Math.round(V.station - V.x); for (const lx of [9, 141]){ bx.fillStyle = `rgba(255,210,110,${a * .4})`; disc(bx, sx + lx + 1, trackY - 30, 7, `rgba(255,210,110,${a * .25})`); } }
+  bx.globalCompositeOperation = 'source-over';
+}
+function mix(a, b, t){ const A = parseInt(a.slice(1), 16), B2 = parseInt(b.slice(1), 16); const r = (A >> 16) + ((B2 >> 16) - (A >> 16)) * t, g = (A >> 8 & 255) + ((B2 >> 8 & 255) - (A >> 8 & 255)) * t, bl = (A & 255) + ((B2 & 255) - (A & 255)) * t; return '#' + [r, g, bl].map(v => Math.round(v).toString(16).padStart(2, '0')).join(''); }
+function floatText(txt, col){ V.float.push({ txt, col, x:trainFront() - 40, y:trackY - 50, t:0 }); }
+
+// =====================================================================================
+//  HUD, bar, panels
+// =====================================================================================
+let dispMoney = 0, panelName = null;
+$('#coinImg').src = ICONS.coin;
+const BAR = [['market','Market'],['pax','Passengers'],['con','Contracts'],['map','Map'],['train','Train'],['crew','Crew'],['bank','Bank'],['gear','Settings']];
+$('#bar').innerHTML = BAR.map(([k, n]) => `<button class="tb" data-p="${k}" title="${n}" aria-label="${n}"><img class="px" src="${ICONS[k === 'pax' ? 'pax' : k]}" alt=""></button>`).join('');
+$('#bar').addEventListener('click', e => { const b = e.target.closest('.tb'); if (!b || b.disabled) return; const k = b.dataset.p; if (panelName === k) closePanel(); else openPanel(k); });
+
+function refreshHud(){
+  if (!G) return;
+  const w = $('#where');
+  if (G.trip){
+    const T = G.trip;
+    w.innerHTML = `<span>${esc(TOWN[T.from].n)} → ${esc(TOWN[T.to].n)}</span><span class="prog">${Array.from({ length:T.segs }, (_, i) => `<i class="${i < T.seg ? 'on' : ''}"></i>`).join('')}</span>`;
+  } else w.innerHTML = `<span>${esc(TOWN[G.town].n)} Station</span>`;
+  const cond = Math.round(G.train.cond);
+  $('#dayChip').innerHTML = `Day ${Math.floor(G.day)} <span style="color:${cond < 40 ? '#b8322f' : cond < 70 ? '#c98f1a' : '#3f8a3e'}">♥${cond}%</span>`;
+  // which buttons work right now
+  const away = !!G.trip;
+  for (const b of document.querySelectorAll('.tb')){
+    const k = b.dataset.p;     b.classList.toggle('on', panelName === k);
+    const old = b.querySelector('.dot'); if (old) old.remove();
+    let dot = 0;
+    if (!away && k === 'pax') dot = G.offers[G.town].pax.length;
+    if (!away && k === 'con') dot = G.offers[G.town].con.length;
+    if (dot) b.insertAdjacentHTML('beforeend', `<span class="dot">${dot}</span>`);
+  }
+}
+let newsTimer = 0;
+function showNews(txt){ const n = $('#news'); n.innerHTML = `<b>NEWS:</b> ${esc(txt)}`; n.style.opacity = 1; newsTimer = 9; }
+function toast(txt, cls = ''){ const d = document.createElement('div'); d.className = 'toast ' + cls; d.textContent = txt; $('#toasts').appendChild(d); setTimeout(() => d.remove(), 3200); }
+
+function openPanel(k){ panelName = k; $('#panel').hidden = false; renderPanel(); refreshHud(); }
+function rerender(){ if (panelName) renderPanel(); }
+function closePanel(){ panelName = null; $('#panel').hidden = true; refreshHud(); }
+let tabs = { market:'buy', bank:'invest', train:'cars', map:null };
+function panelShell(title, sub, body){ return `<div class="ph"><h2>${title}</h2><span class="sub">${sub || ''}</span><button class="x" data-a="close">✕</button></div><div class="pb">${body}</div>`; }
+function renderPanel(){
+  const p = $('#panel'), pb = p.querySelector('.pb'), st = pb ? pb.scrollTop : 0;
+  p.innerHTML = PANELS[panelName]();
+  const nb = p.querySelector('.pb'); if (nb) nb.scrollTop = st;
+  if (panelName === 'map') drawMap();
+}
+const awayNote = what => `<div class="card">You are on the rails. ${what} opens when you pull into a station.</div>`;
+
+const PANELS = {
+  market(){
+    if (G.trip) return panelShell('Market', '', awayNote('The market') + cargoList());
+    const t = G.town, used = cargoUsed(), cap = capOf();
+    const rows = [...GOODS, CONTRA].map(g => {
+      const have = G.cargo[g.id] || 0, b = buyP(t, g.id), s = sellP(t, g.id), m = G.mk[t][g.id].mult;
+      if (g.id === 'moon' && !TOWN[t].shady && !have) return '';
+      const tag = g.id === 'moon' ? '<span class="tag il">ILLEGAL</span>' : TOWN[t].prod.includes(g.id) ? '<span class="tag p">MADE HERE</span>' : m >= 1.3 ? '<span class="tag w">WANTED</span>' : '';
+      const ev = G.events.find(e => e.town === t && e.good === g.id);
+      const evTag = ev ? `<span class="tag e">${ev.f > 1 ? 'BOOM' : 'GLUT'}</span>` : '';
+      const paid = have && G.paid[g.id] ? G.paid[g.id] : 0, pl = paid ? s - paid : 0;
+      const room = g.id === 'moon' ? capOf() - used + hideCap() - moonUsed() : cap - used;
+      const maxBuy = Math.max(0, Math.min(room, Math.floor(G.money / b)));
+      return `<tr><td>${gImg(g.id)} <b>${g.n}</b>${tag}${evTag}</td>
+        <td class="r num">${fmt(b)}</td><td class="r num">${fmt(s)}</td>
+        <td class="r"><b>${have || '–'}</b>${paid ? `<div class="small ${pl >= 0 ? 'up' : 'dn'}">paid ${fmt(paid)}</div>` : ''}</td>
+        <td class="r"><button class="btn" data-a="buy:${g.id}:1" ${maxBuy < 1 ? 'disabled' : ''}>+1</button> <button class="btn" data-a="buy:${g.id}:${maxBuy}" ${maxBuy < 2 ? 'disabled' : ''}>Max</button></td>
+        <td class="r"><button class="btn" data-a="sell:${g.id}:1" ${!have ? 'disabled' : ''}>-1</button> <button class="btn ${pl > 0 ? 'go' : ''}" data-a="sell:${g.id}:${have}" ${!have ? 'disabled' : ''}>All${have ? ' ' + fmt(s * have) : ''}</button></td></tr>`;
+    }).join('');
+    const nEv = G.events.filter(e => e.town === t).length;
+    return panelShell('Market', `${TOWN[t].n}`, `<div class="capline"><span>Cargo ${used}/${cap}</span>${hideCap() ? `<span>Hidden hold ${moonUsed()}/${hideCap()}</span>` : ''}<span class="muted small grow">Prices fall as you sell and rise as you buy. They recover over a few days.</span></div>
+      <table class="mk"><tr><th>Good</th><th class="r">Buy</th><th class="r">Sell</th><th class="r">Have</th><th class="r"></th><th class="r"></th></tr>${rows}</table>
+      ${nEv ? '' : ''}${newsList(4)}`);
+  },
+  pax(){
+    const seats = seatsOf(), rich = richOf();
+    const onboard = G.pax.length ? G.pax.map(p => `<div class="card row"><span class="grow">${p.n} × ${p.cls === 'rich' ? '<b>Rich</b>' : 'Regular'} to <b>${TOWN[p.to].n}</b></span><span class="num">${fmt(p.fare * p.n)}</span></div>`).join('') : '<div class="muted">Nobody aboard.</div>';
+    let waiting = '';
+    if (!G.trip){
+      const o = G.offers[G.town];
+      waiting = o.pax.length ? o.pax.map(p => {
+        const free = p.cls === 'rich' ? rich - paxUsed('rich') : seats - paxUsed('std');
+        const ok = free >= p.n;
+        return `<div class="card row"><span class="grow">${p.n} × ${p.cls === 'rich' ? '<b>Rich</b> <span class="tag e">LUXURY CAR</span>' : 'Regular'} to <b>${TOWN[p.to].n}</b><div class="small muted">${fmt(p.fare)} each · ${segsFor(route(G.town, p.to).d)} segments away</div></span>
+          <span class="num">${fmt(p.fare * p.n)}</span><button class="btn go" data-a="board:${p.id}" ${ok ? '' : 'disabled'}>${ok ? 'Board' : p.cls === 'rich' && !rich ? 'Need luxury car' : 'No seats'}</button></div>`;
+      }).join('') : '<div class="muted">The platform is empty. More travelers show up each day.</div>';
+    }
+    return panelShell('Passengers', `Seats ${paxUsed('std')}/${seats} · Luxury ${paxUsed('rich')}/${rich}`,
+      (G.trip ? '' : `<h3 style="margin:2px 0 6px">Waiting at ${TOWN[G.town].n}</h3>${waiting}`) + `<h3 style="margin:10px 0 6px">On board</h3>${onboard}<div class="small muted">Fares are paid when you stop at their station.</div>`);
+  },
+  con(){
+    const act = G.contracts.length ? G.contracts.map(c => {
+      const left = c.due - Math.floor(G.day), have = G.cargo[c.good] || 0;
+      return `<div class="card row">${gImg(c.good)}<span class="grow"><b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b><div class="small ${left <= 1 ? 'dn' : 'muted'}">Due day ${c.due} (${left <= 0 ? 'today!' : left + ' days left'}) · you have ${have}/${c.qty} · late fine ${fmt(c.fine)}</div></span><span class="num up">${fmt(c.pay)}</span></div>`;
+    }).join('') : '<div class="muted">No active contracts.</div>';
+    let board = '';
+    if (!G.trip){
+      const o = G.offers[G.town];
+      board = o.con.map(c => `<div class="card row">${gImg(c.good)}<span class="grow">Deliver <b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b><div class="small muted">By day ${c.due} · fine if late ${fmt(c.fine)} · you buy the goods</div></span><span class="num up">${fmt(c.pay)}</span><button class="btn go" data-a="take:${c.id}" ${G.contracts.length >= 4 ? 'disabled' : ''}>Accept</button></div>`).join('') || '<div class="muted">No work posted today.</div>';
+    }
+    return panelShell('Contracts', `${G.contracts.length}/4 active`, (G.trip ? '' : `<h3 style="margin:2px 0 6px">Job board</h3>${board}`) + `<h3 style="margin:10px 0 6px">Your contracts</h3>${act}<div class="small muted">Contracts pay automatically when you arrive with the goods.</div>`);
+  },
+  map(){
+    const sel = tabs.map && tabs.map !== G.town ? tabs.map : null;
+    let info = '<div class="muted">Tap a town on the map.</div>';
+    const cur = G.town || G.trip.to;
+    if (sel){
+      const t = TOWN[sel], seen = G.seen[sel];
+      const wants = seen ? GOODS.filter(g => G.mk[sel][g.id].mult >= 1.3).map(g => gImg(g.id)).join(' ') : '<span class="muted">Visit to find out</span>';
+      let pr = '';
+      if (seen){
+        pr = `<div class="small muted" style="margin-top:4px">Prices on day ${seen.day} (buy / sell):</div><table class="mk small">` + GOODS.map(g => {
+          const [b, s] = seen.p[g.id], here = G.town ? sellP(G.town, g.id) : 0, hb = G.town ? buyP(G.town, g.id) : 0;
+          const hint = G.town && s - hb > 0 ? `<span class="up">+${fmt(s - hb)}</span>` : '';
+          return `<tr><td>${gImg(g.id)} ${g.n}</td><td class="r num">${fmt(b)}</td><td class="r num">${fmt(s)}</td><td class="r small">${hint}</td></tr>`; }).join('') + '</table>';
+      }
+      let go = '';
+      if (G.town){ const p = tripPreview(sel); go = `<div class="card hl"><div>${p.segs} segments · ~${p.secs}s · ${p.days} days</div><div class="small muted">Coal ${G.freeCoal ? 'partly free' : fmt(p.coal)}${p.path.length > 2 ? ' · via ' + p.path.slice(1, -1).map(x => TOWN[x].n).join(', ') : ''}</div><button class="btn go big" data-a="go:${sel}" style="margin-top:6px;width:100%">All aboard! → ${t.n}</button></div>`; }
+      info = `<h3 style="margin:0">${t.n}</h3><div class="small muted">${t.biome[0].toUpperCase() + t.biome.slice(1)} · ${['', 'small', 'medium', 'big'][t.size]} town${t.bank ? ' · bank' : ''}${t.shop ? ' · train yard' : ''}${t.shady ? ' · <span class="dn">lawless</span>' : ''}</div>
+        <div style="margin:4px 0">Makes: ${t.prod.map(g => gImg(g)).join(' ')} &nbsp; Wants: ${wants}</div>${go}${pr}`;
+    } else if (G.trip) info = `<div class="card">Heading to <b>${TOWN[G.trip.to].n}</b>. Segment ${G.trip.seg + 1} of ${G.trip.segs}.</div>`;
+    return panelShell('Map', G.trip ? 'On the rails' : 'Pick a destination', `<div class="mapwrap"><div class="mapbox" id="mapbox"><canvas id="mapcv"></canvas></div><div class="mapinfo">${info}</div></div>`);
+  },
+  train(){
+    const L = loco(), tab = tabs.train;
+    const carsList = G.train.cars.map((c, i) => `<div class="card row"><span class="grow"><b>${CARS[c].n}</b><div class="small muted">${CARS[c].desc}</div></span>${G.town && TOWN[G.town].shop ? `<button class="btn bad" data-a="sellcar:${i}">Sell ${fmt(CARS[c].price * .5)}</button>` : ''}</div>`).join('');
+    const shop = G.town && TOWN[G.town].shop;
+    const buy = shop ? Object.entries(CARS).map(([k, c]) => `<div class="card row"><span class="grow"><b>${c.n}</b><div class="small muted">${c.desc}</div></span><button class="btn go" data-a="buycar:${k}" ${G.money < c.price || G.train.cars.length >= L.cars ? 'disabled' : ''}>${fmt(c.price)}</button></div>`).join('') : '<div class="muted">Buy cars and engines at a town with a train yard (Fairhaven, Ironvale, Grand Central, Port Bell).</div>';
+    const next = LOCOS[G.train.loco + 1];
+    const cost = Math.ceil((100 - G.train.cond) * 3.2);
+    return panelShell('Train', `${L.n} · ${G.train.cars.length}/${L.cars} cars`, `
+      <div class="card row"><span class="grow"><b>Condition ${Math.round(G.train.cond)}%</b><div class="bar" style="margin-top:3px"><i style="width:${G.train.cond}%;background:${G.train.cond < 40 ? '#b8322f' : G.train.cond < 70 ? '#e8b23a' : '#3f8a3e'}"></i></div><div class="small muted">Below 50% the train runs slow and breaks down more.</div></span>
+        ${G.town ? `<button class="btn" data-a="repair" ${cost < 1 || G.money < cost ? 'disabled' : ''}>Repair ${fmt(cost)}</button>` : ''}</div>
+      <div class="card"><b>Engine: ${L.n}</b> <span class="small muted">speed ×${L.speed} · up to ${L.cars} cars · coal ${fmt(coalPerSeg())}/segment</span>
+        ${next ? `<div class="row" style="margin-top:4px"><span class="grow small">Next: <b>${next.n}</b> (speed ×${next.speed}, ${next.cars} cars)</span>${shop ? `<button class="btn gold" data-a="loco" ${G.money < next.price ? 'disabled' : ''}>${fmt(next.price)}</button>` : `<span class="small muted">${fmt(next.price)} at a train yard</span>`}</div>` : '<div class="small">The finest engine on the rails.</div>'}</div>
+      <h3 style="margin:8px 0 6px">Your cars</h3>${carsList}
+      <h3 style="margin:8px 0 6px">Train yard</h3>${buy}`);
+  },
+  crew(){
+    const mine = G.crew.length ? G.crew.map(c => `<div class="card row"><span class="grow"><b>${esc(c.name)}</b> · ${ROLES[c.role].n} <span class="small muted">skill ${'★'.repeat(c.skill)}</span>
+      <div class="row small"><span>Mood</span><div class="bar grow" style="max-width:120px"><i style="width:${c.mood}%;background:${c.mood < 30 ? '#b8322f' : c.mood < 60 ? '#e8b23a' : '#3f8a3e'}"></i></div><span class="muted">${c.mood < 30 ? 'miserable' : c.mood < 50 ? 'grumpy' : c.mood < 75 ? 'fine' : 'happy'}</span></div>
+      <div class="small muted">${ROLES[c.role].desc} · ${fmt(c.wage)}/day</div></span>
+      <button class="btn gold" data-a="bonus:${c.id}" ${G.money < c.wage * 2 ? 'disabled' : ''}>Bonus ${fmt(c.wage * 2)}</button>${G.town ? `<button class="btn bad" data-a="fire:${c.id}">Fire</button>` : ''}</div>`).join('') : '<div class="muted">No crew. You are shoveling your own coal.</div>';
+    let hire = '';
+    if (!G.trip){
+      const o = G.offers[G.town];
+      hire = o.hire.map(c => { const taken = !!crew(c.role); return `<div class="card row"><span class="grow"><b>${esc(c.name)}</b> · ${ROLES[c.role].n} <span class="small muted">skill ${'★'.repeat(c.skill)}</span><div class="small muted">${ROLES[c.role].desc} · ${fmt(c.wage)}/day</div></span>
+        <button class="btn go" data-a="hire:${c.id}" ${taken ? 'disabled' : ''}>${taken ? 'Have one' : 'Hire'}</button></div>`; }).join('') || '<div class="muted">Nobody looking for work here today.</div>';
+    }
+    return panelShell('Crew', `Wages ${fmt(G.crew.reduce((s, c) => s + c.wage, 0))}/day`, `${mine}<div class="small muted" style="margin:4px 0 8px">Wages are paid when you arrive. Unpaid or ignored crew get grumpy: they slack off, pocket cash, or quit. Happy crew work harder.</div>${G.trip ? '' : `<h3 style="margin:4px 0 6px">For hire at ${TOWN[G.town].n}</h3>${hire}`}`);
+  },
+  bank(){
+    const tab = tabs.bank;
+    const head = `<div class="tabs"><button class="tab ${tab === 'invest' ? 'on' : ''}" data-a="tab:bank:invest">Investments</button><button class="tab ${tab === 'loan' ? 'on' : ''}" data-a="tab:bank:loan">Loans</button><button class="tab ${tab === 'news' ? 'on' : ''}" data-a="tab:bank:news">News</button></div>`;
+    let body = '';
+    if (tab === 'invest'){
+      const own = [];
+      for (const t in G.biz) for (const b of G.biz[t]) if (b.owned) own.push(`<div class="card row"><span class="grow"><b>${b.n}</b>, ${TOWN[t].n}<div class="small muted">${b.owned} shares · earns ${fmt(b.owned * b.price * b.rate)}/hr</div></span>${G.town === t ? `<button class="btn bad" data-a="sellsh:${b.id}">Sell 1 ${fmt(b.price / 1.15 * .75)}</button>` : ''}</div>`);
+      const here = G.town ? G.biz[G.town].map(b => `<div class="card row"><span class="grow"><b>${b.n}</b><div class="small muted">1 share earns ${fmt(b.price * b.rate)}/hr · you own ${b.owned}/10</div></span><button class="btn go" data-a="buysh:${b.id}" ${G.money < b.price || b.owned >= 10 ? 'disabled' : ''}>${b.owned >= 10 ? 'Maxed' : 'Buy ' + fmt(b.price)}</button></div>`).join('') : '';
+      body = `<div class="card hl row"><span class="grow"><b>Income ${fmt(incomePerHour())}/hour</b><div class="small muted">Shares pay every minute in real time, even while the game is closed (up to 8 hours).</div></span></div>
+        ${G.town ? `<h3 style="margin:8px 0 6px">Businesses in ${TOWN[G.town].n}</h3>${here}` : ''}<h3 style="margin:8px 0 6px">Your shares</h3>${own.join('') || '<div class="muted">None yet. Every town sells shares in its businesses.</div>'}`;
+    } else if (tab === 'loan'){
+      const limit = Math.max(0, Math.round((1000 + Math.max(0, netWorth()) * .5) / 50) * 50 - G.loan);
+      const bank = G.town && TOWN[G.town].bank;
+      body = `<div class="card"><b>Loan: ${fmt(G.loan)}</b> <span class="small muted">2.5% interest added every day</span>
+        ${bank ? `<div class="row" style="margin-top:6px;flex-wrap:wrap">${[250, 1000, 3000].map(v => `<button class="btn" data-a="borrow:${v}" ${v > limit ? 'disabled' : ''}>Borrow ${fmt(v)}</button>`).join('')}
+          <button class="btn go" data-a="repay" ${!G.loan || G.money < 1 ? 'disabled' : ''}>Repay ${fmt(Math.min(G.loan, Math.max(0, G.money)))}</button></div><div class="small muted">You can borrow ${fmt(limit)} more.</div>` : '<div class="small muted" style="margin-top:4px">Banks are in Fairhaven, Grand Central and Port Bell.</div>'}</div>
+        <div class="card small">Net worth: <b>${fmt(netWorth())}</b> · Most money held: ${fmt(G.stats.best)} · Trips: ${G.stats.trips}</div>`;
+    } else body = newsList(25);
+    return panelShell('Bank', G.town && TOWN[G.town].bank ? TOWN[G.town].n + ' Bank' : '', head + body);
+  },
+  gear(){
+    return panelShell('Settings', '', `<div class="card">Pixel Rails: first build. Your game saves on this phone automatically.</div>
+      <div class="card row"><span class="grow">Start a brand new world (new prices, new everything)</span><button class="btn bad" data-a="reset">${resetArm ? 'Tap again to confirm' : 'New game'}</button></div>`);
+  },
+};
+let resetArm = false;
+function newsList(n){ return `<h3 style="margin:10px 0 6px">News</h3>` + G.news.slice(0, n).map(x => `<div class="card small"><b>Day ${x.day}:</b> ${esc(x.txt)}</div>`).join(''); }
+function cargoList(){ const k = Object.keys(G.cargo).filter(g => G.cargo[g] > 0); return `<h3 style="margin:8px 0 6px">Cargo ${cargoUsed()}/${capOf()}</h3>` + (k.length ? k.map(g => `<div class="card row">${gImg(g)}<span class="grow">${GOOD[g].n}</span><b>${G.cargo[g]}</b></div>`).join('') : '<div class="muted">Empty.</div>'); }
+
+// ---- panel actions ----
+$('#panel').addEventListener('click', e => {
+  const b = e.target.closest('[data-a]'); if (!b || b.disabled) return;
+  const [a, x, y] = b.dataset.a.split(':');
+  const t = G.town;
+  switch (a){
+    case 'close': closePanel(); return;
+    case 'tab': tabs[x] = y; break;
+    case 'buy': { const n = +y, g = x; let spent = 0, k = 0;
+      for (; k < n; k++){ const p = buyP(t, g); if (G.money < p) break; const room = g === 'moon' ? capOf() - cargoUsed() + hideCap() - moonUsed() : capOf() - cargoUsed(); if (room <= 0) break;
+        G.money -= p; spent += p; G.paid[g] = Math.round(((G.paid[g] || 0) * (G.cargo[g] || 0) + p) / ((G.cargo[g] || 0) + 1)); G.cargo[g] = (G.cargo[g] || 0) + 1; G.mk[t][g].press = clamp(G.mk[t][g].press - .022, -.6, .75); }
+      if (k) toast(`Bought ${k} ${GOOD[g].n} for ${fmt(spent)}`); break; }
+    case 'sell': { const n = +y, g = x; let got = 0, k = 0;
+      for (; k < n && (G.cargo[g] || 0) > 0; k++){ const p = sellP(t, g); G.money += p; got += p; G.cargo[g]--; G.mk[t][g].press = clamp(G.mk[t][g].press + .028, -.6, .75); }
+      if (!G.cargo[g]) { delete G.cargo[g]; delete G.paid[g]; }
+      if (k){ const prof = got - (G.paid[g] || 0) * 0; G.stats.earned += got; floatText('+' + fmt(got), '#ffd166'); toast(`Sold ${k} ${GOOD[g].n} for ${fmt(got)}`, 'g'); } break; }
+    case 'board': { const o = G.offers[t], p = o.pax.find(q => q.id === +x); if (!p) break; o.pax.splice(o.pax.indexOf(p), 1); G.pax.push(p); toast(`${p.n} passenger${p.n > 1 ? 's' : ''} boarded for ${TOWN[p.to].n}`, 'g'); break; }
+    case 'take': { const o = G.offers[t], c = o.con.find(q => q.id === +x); if (!c || G.contracts.length >= 4) break; o.con.splice(o.con.indexOf(c), 1); G.contracts.push(c); toast('Contract accepted', 'g'); break; }
+    case 'go': depart(x); return;
+    case 'repair': { const cost = Math.ceil((100 - G.train.cond) * 3.2); if (G.money >= cost){ G.money -= cost; G.train.cond = 100; toast('Good as new!', 'g'); } break; }
+    case 'buycar': { const c = CARS[x]; if (G.money >= c.price && G.train.cars.length < loco().cars){ G.money -= c.price; G.train.cars.push(x); toast(`${c.n} coupled on!`, 'g'); if (V.stationTown) V.placeStation(); } break; }
+    case 'sellcar': { const i = +x, c = G.train.cars[i];
+      if (c === 'freight' && capOf() - CARS.freight.cap < cargoUsed()){ toast('Unload the cargo first', 'r'); break; }
+      if (c === 'coach' && seatsOf() - CARS.coach.seats < paxUsed('std')){ toast('Passengers are sitting in it!', 'r'); break; }
+      if (c === 'luxury' && richOf() - CARS.luxury.rich < paxUsed('rich')){ toast('Passengers are sitting in it!', 'r'); break; }
+      G.train.cars.splice(i, 1); G.money += CARS[c].price * .5; if (V.stationTown) V.placeStation(); break; }
+    case 'loco': { const n = LOCOS[G.train.loco + 1]; if (n && G.money >= n.price){ G.money -= n.price; G.train.loco++; sprites.loco = locoSprite(loco()); toast(`The ${n.n} is yours!`, 'g'); if (V.stationTown) V.placeStation(); } break; }
+    case 'hire': { const o = G.offers[t], c = o.hire.find(q => q.id === +x); if (!c || crew(c.role)) break; o.hire.splice(o.hire.indexOf(c), 1); G.crew.push(c); toast(`${c.name} joins the crew`, 'g'); break; }
+    case 'fire': { const c = G.crew.find(q => q.id === +x); if (c){ G.crew.splice(G.crew.indexOf(c), 1); G.crew.forEach(q => q.mood = clamp(q.mood - 6, 0, 100)); toast(`${c.name} packs their bags`); } break; }
+    case 'bonus': { const c = G.crew.find(q => q.id === +x); if (c && G.money >= c.wage * 2){ G.money -= c.wage * 2; c.mood = clamp(c.mood + 22, 0, 100); toast(`${c.name} grins ear to ear`, 'g'); } break; }
+    case 'buysh': { const b = G.biz[t].find(q => q.id === x); if (b && G.money >= b.price && b.owned < 10){ G.money -= b.price; b.owned++; b.price = Math.round(b.price * 1.15 / 5) * 5; toast(`Bought a share of ${b.n}`, 'g'); } break; }
+    case 'sellsh': { const b = G.biz[t].find(q => q.id === x); if (b && b.owned){ b.price = Math.round(b.price / 1.15 / 5) * 5; G.money += Math.round(b.price * .75); b.owned--; } break; }
+    case 'borrow': G.loan += +x; G.money += +x; toast(`Borrowed ${fmt(+x)}`); break;
+    case 'repay': { const v = Math.min(G.loan, Math.max(0, Math.floor(G.money))); G.loan -= v; G.money -= v; toast(`Repaid ${fmt(v)}`, 'g'); break; }
+    case 'reset': if (!resetArm){ resetArm = true; setTimeout(() => { resetArm = false; if (panelName === 'gear') renderPanel(); }, 3000); break; }
+      resetArm = false; try { localStorage.removeItem(SAVE_KEY); } catch (e2) {} newGame(); V.x = 0; V.smoke = []; buildSprites(); V.arrive(G.town); closePanel(); save(); showNews(G.news[0].txt); return;
+  }
+  save(); refreshHud(); if (panelName) renderPanel();
+});
+
+// ---- the map ----
+function drawMap(){
+  const box = $('#mapbox'), c = $('#mapcv'); if (!box || !c) return;
+  const w = box.clientWidth, h = box.clientHeight, dpr = Math.min(devicePixelRatio || 1, 3);
+  const S = 3;                                             // chunky pixels
+  c.width = Math.ceil(w * dpr / S); c.height = Math.ceil(h * dpr / S);
+  const g = c.getContext('2d'), W = c.width, H = c.height;
+  const X = t => Math.round(8 + TOWN[t].x / 100 * (W - 16)), Y = t => Math.round(6 + TOWN[t].y / 62 * (H - 14));
+  // land
+  P(g, '#8fc0d8', 0, 0, W, H);
+  g.fillStyle = '#d9c48e'; g.beginPath(); g.ellipse(W / 2, H / 2, W * .52, H * .55, 0, 0, Math.PI * 2); g.fill();
+  P(g, '#8fc0d8', Math.round(W * .66), Math.round(H * .78), W, H);
+  for (let i = 0; i < 120; i++) P(g, '#cbb57e', hash(i * 3) * W | 0, hash(i * 5) * H | 0, 2, 1);
+  // biome blobs
+  for (const t of TOWNS){ const col = { plains:'#a9c47a', forest:'#6f9a5a', snow:'#eef2f8', desert:'#e6b47a', coast:'#e8d6a0', city:'#b4b0b8' }[t.biome]; g.fillStyle = col; g.beginPath(); g.ellipse(X(t.id), Y(t.id), 10, 7, 0, 0, Math.PI * 2); g.fill(); }
+  // rails
+  for (const [a, b] of EDGES){
+    const x1 = X(a), y1 = Y(a), x2 = X(b), y2 = Y(b), n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+    for (let i = 0; i <= n; i++){ const x = Math.round(x1 + (x2 - x1) * i / n), y = Math.round(y1 + (y2 - y1) * i / n); P(g, '#5a3a22', x, y, 1, 1); if (i % 3 === 0) P(g, '#8a6a4a', x - (Math.abs(y2 - y1) > Math.abs(x2 - x1) ? 1 : 0), y - (Math.abs(y2 - y1) > Math.abs(x2 - x1) ? 0 : 1), Math.abs(y2 - y1) > Math.abs(x2 - x1) ? 3 : 1, Math.abs(y2 - y1) > Math.abs(x2 - x1) ? 1 : 3); }
+  }
+  // planned route
+  const sel = tabs.map && G.town && tabs.map !== G.town ? route(G.town, tabs.map).path : G.trip ? G.trip.path : null;
+  if (sel) for (let k = 0; k < sel.length - 1; k++){ const x1 = X(sel[k]), y1 = Y(sel[k]), x2 = X(sel[k + 1]), y2 = Y(sel[k + 1]), n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)); for (let i = 0; i <= n; i++) P(g, '#e8b23a', Math.round(x1 + (x2 - x1) * i / n) - 1, Math.round(y1 + (y2 - y1) * i / n) - 1, 2, 2); }
+  // towns
+  for (const t of TOWNS){ const x = X(t.id), y = Y(t.id); P(g, '#24150f', x - 3, y - 3, 7, 7); P(g, t.roof, x - 2, y - 2, 5, 5); P(g, shade(t.roof, .35), x - 2, y - 2, 5, 1); }
+  // the train
+  let tx, ty;
+  if (G.town){ tx = X(G.town); ty = Y(G.town); }
+  else { const T = G.trip, f = (T.seg + T.el / segTime()) / T.segs, p = T.path, n = p.length - 1, kf = Math.min(n - 1e-6, f * n), k = Math.floor(kf), r = kf - k;
+    tx = lerp(X(p[k]), X(p[k + 1]), r); ty = lerp(Y(p[k]), Y(p[k + 1]), r); }
+  P(g, '#24150f', Math.round(tx) - 3, Math.round(ty) - 7, 7, 5); P(g, '#ffd166', Math.round(tx) - 2, Math.round(ty) - 6, 5, 3);
+  // labels (HTML, crisp)
+  box.querySelectorAll('.lbl').forEach(l => l.remove());
+  for (const t of TOWNS){
+    const l = document.createElement('div'); l.className = 'lbl' + (t.id === G.town ? ' here' : t.id === tabs.map ? ' sel' : '');
+    l.textContent = t.n; l.style.left = (X(t.id) * S / dpr) + 'px'; l.style.top = (Y(t.id) * S / dpr + 8) + 'px'; box.appendChild(l);
+  }
+  c.onclick = e => {
+    const rct = c.getBoundingClientRect(), mx = (e.clientX - rct.left) / rct.width * W, my = (e.clientY - rct.top) / rct.height * H;
+    let best = null, bd = 1e9; for (const t of TOWNS){ const d = Math.hypot(X(t.id) - mx, Y(t.id) - my); if (d < bd){ bd = d; best = t.id; } }
+    if (bd < 22){ tabs.map = best; renderPanel(); }
+  };
+}
+
+// ---- modals ----
+let modalHandler = null;
+function modal(html, onClick){ const m = $('#modal'); m.innerHTML = `<div class="mb">${html}</div>`; m.hidden = false; modalHandler = onClick; }
+function closeModal(){ $('#modal').hidden = true; modalHandler = null; }
+$('#modal').addEventListener('click', e => { if (modalHandler) modalHandler(e); });
+function showArrival(t, lines, fares, inspect){
+  const net = lines.reduce((s, l) => s + (l[1] || 0) + (l[2] || 0), 0);
+  const body = lines.filter(l => l[1] || l[2] || !l[1]).map(l => `<div><span>${esc(l[0])}</span><span class="num ${(l[1] || l[2] || 0) >= 0 ? 'up' : 'dn'}">${l[1] || l[2] ? ((l[1] || l[2]) > 0 ? '+' : '') + fmt(l[1] || l[2]) : ''}</span></div>`).join('');
+  const finish = () => {
+    modal(`<h3>Welcome to ${esc(t.n)}!</h3><div class="t lines">${body}<div style="border:none;margin-top:4px"><b>Trip total</b><b class="num ${net >= 0 ? 'up' : 'dn'}">${net >= 0 ? '+' : ''}${fmt(net)}</b></div></div>
+      <div class="ch"><button class="btn go" data-ok>Off to the market</button><button class="btn" data-x>Stay on the platform</button></div>`,
+      e => { if (e.target.closest('[data-ok]')){ closeModal(); openPanel('market'); } else if (e.target.closest('[data-x]')) closeModal(); });
+    if (net > 0) floatText('+' + fmt(net), '#ffd166');
+  };
+  if (!inspect) return finish();
+  const n = moonUsed(), fine = Math.round(n * CONTRA.base * 1.6), bribe = Math.round(fine * .45);
+  modal(`<h3>Inspector!</h3><div class="t">A railroad inspector boards with a lantern and starts opening crates. He finds your ${n} crates of moonshine.</div>
+    <div class="ch"><button class="btn gold" data-b>Slip him a bribe (${fmt(bribe)})</button><button class="btn bad" data-f>Pay the fine (${fmt(fine)}) and lose the crates</button></div>`,
+    e => {
+      if (e.target.closest('[data-b]')){ if (Math.random() < .7){ G.money -= bribe; lines.push(['Bribe', -bribe]); } else { G.money -= fine + bribe; delete G.cargo.moon; lines.push(['Bribe refused! Fine', -(fine + bribe)]); } finish(); save(); refreshHud(); rerender(); }
+      else if (e.target.closest('[data-f]')){ G.money -= fine; delete G.cargo.moon; lines.push(['Fine + crates seized', -fine]); finish(); save(); refreshHud(); rerender(); }
+    });
+}
+
+// =====================================================================================
+//  loop + start
+// =====================================================================================
+let last = performance.now(), hudT = 0, saveT = 0;
+function frame(now){
+  const dt = Math.min(.05, (now - last) / 1000) * (window.__speed || 1); last = now;
+  if (G){
+    update(dt);
+    accrue(dt);
+    drawScene();
+    hudT -= dt; if (hudT <= 0){ hudT = .25; refreshHud(); if (panelName === 'map' && G.trip) drawMap(); }
+    saveT -= dt; if (saveT <= 0){ saveT = 5; save(); }
+    newsTimer -= dt; if (newsTimer < 0) $('#news').style.opacity = 0;
+    dispMoney += (G.money - dispMoney) * Math.min(1, dt * 6); if (Math.abs(G.money - dispMoney) < 1) dispMoney = G.money;
+    const m = $('#money'); const s = fmt(dispMoney); if (m.textContent !== s) m.textContent = s; m.style.color = G.money < 0 ? '#b8322f' : '#2d5a1c';
+  }
+  requestAnimationFrame(frame);
+}
+function boot(){
+  G = load();
+  let away = 0;
+  if (G){
+    const sec = Math.min(8 * 3600, Math.max(0, (Date.now() - G.wall) / 1000));
+    away = Math.round(incomePerHour() * sec / 3600);
+    if (away > 0){ G.money += away; G.stats.earned += away; }
+  } else newGame();
+  resize(); buildSprites();
+  if (G.town){ V.arrive(G.town); }
+  else { V.v = CRUISE; setBiome(G.trip.legs[Math.min(G.trip.seg, G.trip.legs.length - 1)]); V.fade = 1; }
+  dispMoney = G.money;
+  refreshHud();
+  showNews(G.news[0].txt);
+  if (away > 0) modal(`<h3>While you were away</h3><div class="t">Your businesses earned <b class="up">${fmt(away)}</b>.</div><div class="ch"><button class="btn go" data-ok>Nice</button></div>`, e => { if (e.target.closest('[data-ok]')) closeModal(); });
+  requestAnimationFrame(t => { last = t; frame(t); });
+}
+addEventListener('resize', () => { resize(); if (panelName === 'map') drawMap(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else if (G){ const sec = Math.min(8 * 3600, Math.max(0, (Date.now() - G.wall) / 1000)); if (sec > 30){ const v = Math.round(incomePerHour() * sec / 3600); if (v > 0){ G.money += v; toast(`Your businesses earned ${fmt(v)} while you were away`, 'g'); } } G.wall = Date.now(); } });
+addEventListener('pagehide', save);
+// test hooks
+window.__pr = { get G(){ return G; }, V, depart, openPanel, closePanel, segmentDone, roadEvent, refreshHud, newGame:() => { newGame(); buildSprites(); V.arrive(G.town); } };
+boot();
+})();
+</script>
