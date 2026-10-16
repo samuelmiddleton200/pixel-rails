@@ -106,9 +106,9 @@ img.px{image-rendering:pixelated}
 .chip img{width:18px;height:18px}
 #money{font-size:17px;color:#2d5a1c}
 #where{flex:1;justify-content:center;font-family:var(--body);font-weight:700;font-size:15px;min-width:0;overflow:hidden}
-#where .prog{display:flex;gap:2px;margin-left:6px}
-#where .prog i{width:9px;height:9px;border:2px solid var(--ink);border-radius:2px;background:var(--paper-d)}
-#where .prog i.on{background:var(--gold)}
+#where .prog{width:90px;height:10px;margin-left:8px;border:2px solid var(--ink);border-radius:3px;background:var(--paper-d);overflow:hidden;flex:none}
+#where .prog b{display:block;height:100%;background:var(--gold)}
+#where .mi{margin-left:8px;font-size:13px;color:#7a5a3c}
 #news{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 46px);max-width:70%;
   background:rgba(42,26,20,.82);color:#fbe7b5;border-radius:6px;padding:3px 10px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;transition:opacity .4s}
 #news b{color:#ffd166}
@@ -292,7 +292,15 @@ function route(from, to){                                  // dijkstra over the 
   const path = [to]; while (path[0] !== from) path.unshift(P[path[0]]);
   return { path, d:D[to] };
 }
-const SEG_LEN = 6;                                          // map units per segment
+const SEG_LEN = 6;                                          // map units per segment (segments are only the event checkpoints now)
+const LATLON = t => [49.5 - TOWN[t].y * 25 / 62, TOWN[t].x * 59 / 100 - 125];
+function legMiles(a, b){
+  const [la1, lo1] = LATLON(a), [la2, lo2] = LATLON(b), r = Math.PI / 180;
+  const h = Math.sin((la2 - la1) * r / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin((lo2 - lo1) * r / 2) ** 2;
+  return Math.round(3959 * 2 * Math.asin(Math.sqrt(h)) * 1.15 / 5) * 5;
+}
+const pathMiles = path => path.slice(1).reduce((s, t, i) => s + legMiles(path[i], t), 0);
+const fmtMi = m => Math.round(m).toLocaleString('en-US') + ' mi';
 const segsFor = d => Math.max(2, Math.round(d / SEG_LEN));
 
 const LOCOS = [
@@ -306,7 +314,7 @@ const CARS = {
   coach:   { n:'Coach',        price:550,  seats:10, desc:'10 seats for regular passengers.' },
   luxury:  { n:'Luxury Car',   price:2200, rich:6,  desc:'6 plush seats. Rich passengers pay 3-4x.' },
   dining:  { n:'Dining Car',   price:1400,          desc:'All passenger fares +15%. Keeps crew fed (mood).' },
-  casino:  { n:'Casino Car',   price:2800,          desc:'Passengers gamble on the way: house winnings every segment. A card dealer doubles it.' },
+  casino:  { n:'Casino Car',   price:2800,          desc:'Passengers gamble on the way: the house wins a little all trip long. A card dealer doubles it.' },
   smug:    { n:'Hidden Hold',  price:1600, cap:4,   desc:'Secret compartment for 4 crates. Halves the chance inspectors find contraband.' },
 };
 const ROLES = {
@@ -356,7 +364,7 @@ function newGame(){
 }
 
 function save(){ if (!G) return; G.wall = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) {} }
-function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && g.v === 3) return g; } } catch (e) {} return null; }
+function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && g.v === 3){ if (g.trip && !g.trip.miles) g.trip.miles = pathMiles(g.trip.path); if (g.freeCoal && g.freeCoal < 20) g.freeCoal *= 150; return g; } } } catch (e) {} return null; }
 
 // ---- prices ----
 function price(town, g){
@@ -385,7 +393,7 @@ function skill(role){                                       // mood changes how 
 }
 const coalPrice = () => 11;
 const segTime = () => 6 / loco().speed / (1 + .07 * skill('engineer')) * (G.train.cond < 50 ? 1.25 : 1);
-const coalPerSeg = () => loco().coal * (1 - .06 * skill('engineer')) * coalPrice();
+const coalPer100 = () => loco().coal * 5.5 * (1 - .06 * skill('engineer'));     // dollars of coal per 100 miles
 function netWorth(){
   let v = G.money - G.loan;
   for (const t in G.biz) for (const b of G.biz[t]) v += b.owned * b.price * .7;
@@ -487,11 +495,12 @@ function accrue(sec){
 // =====================================================================================
 function tripPreview(to){
   const r = route(G.town, to), segs = segsFor(r.d);
-  return { ...r, segs, coal:Math.round(coalPerSeg() * segs), days:segs * .25, secs:Math.round(segs * segTime()) };
+  const miles = pathMiles(r.path);
+  return { ...r, segs, miles, coal:Math.round(coalPer100() * Math.max(0, miles - G.freeCoal) / 100), days:segs * .25, secs:Math.round(segs * segTime()) };
 }
 function depart(to){
   const p = tripPreview(to);
-  if (G.money < p.coal && G.freeCoal < p.segs){ toast('Not enough money for coal!', 'r'); return; }
+  if (G.money < p.coal){ toast('Not enough money for coal!', 'r'); return; }
   closePanel();
   // biome for each segment: first half looks like where you left, second half like where you are going
   const legs = [];
@@ -499,14 +508,16 @@ function depart(to){
     const f = (i + .5) / p.segs * (p.path.length - 1), k = Math.min(p.path.length - 2, Math.floor(f));
     legs.push(TOWN[f - k < .5 ? p.path[k] : p.path[k + 1]].biome);
   }
-  G.trip = { from:G.town, to, path:p.path, segs:p.segs, seg:0, el:0, legs, log:[], tips:0, sick:false };
+  G.trip = { from:G.town, to, path:p.path, segs:p.segs, miles:p.miles, seg:0, el:0, legs, log:[], tips:0, sick:false };
   G.town = null; G.stats.trips++;
   V.depart();
   save(); refreshHud();
 }
 function segmentDone(){
   const T = G.trip;
-  if (G.freeCoal > 0) G.freeCoal--; else { const c = Math.round(coalPerSeg()); G.money -= c; T.coal = (T.coal || 0) + c; }
+  const segMi = T.miles / T.segs, free = Math.min(G.freeCoal, segMi);   // free coal from the merchant burns first
+  G.freeCoal -= free;
+  const c = Math.round(coalPer100() * (segMi - free) / 100); G.money -= c; T.coal = (T.coal || 0) + c;
   G.train.cond = clamp(G.train.cond - rf(.7, 1.8), 0, 100);
   // casino car: passengers gamble, the house wins
   if (has('casino')){
@@ -524,7 +535,7 @@ function segmentDone(){
 }
 function arrive(){
   const T = G.trip, to = T.to, t = TOWN[to], lines = [];
-  if (T.coal) lines.push([`Coal (${T.segs} segments)`, -T.coal]);
+  if (T.coal) lines.push([`Coal (${fmtMi(T.miles)})`, -T.coal]);
   lines.push(...T.log);
   G.trip = null; G.town = to;
   // fares
@@ -630,7 +641,7 @@ const ROAD = [
     ] },
   { w:() => 1, title:'Coal merchant', text:() => 'A coal merchant at a siding offers a cheap deal.',
     ch:() => [
-      { t:'Buy 4 segments of coal for $25', f:() => { G.money -= 25; G.freeCoal += 4; return 'The tender is stuffed. The next 4 segments burn free coal.'; } },
+      { t:'Buy 600 miles of coal for $25', f:() => { G.money -= 25; G.freeCoal += 600; return 'The tender is stuffed. Your next 600 miles burn free coal.'; } },
       { t:'No need', f:() => 'You wave him off.' },
     ] },
   { w:() => has('casino') ? 1 : 0, title:'Card sharp', text:() => 'A slick gambler in the casino car wants to play the house for high stakes.',
@@ -1126,7 +1137,8 @@ function refreshHud(){
   const w = $('#where');
   if (G.trip){
     const T = G.trip;
-    w.innerHTML = `<span>${esc(TOWN[T.from].n)} → ${esc(TOWN[T.to].n)}</span><span class="prog">${Array.from({ length:T.segs }, (_, i) => `<i class="${i < T.seg ? 'on' : ''}"></i>`).join('')}</span>`;
+    const f = Math.min(1, (T.seg + T.el / segTime()) / T.segs);
+    w.innerHTML = `<span>${esc(TOWN[T.from].n)} → ${esc(TOWN[T.to].n)}</span><span class="prog"><b style="width:${(f * 100).toFixed(1)}%"></b></span><span class="mi">${fmtMi(T.miles * (1 - f))} left</span>`;
   } else w.innerHTML = `<span>${esc(TOWN[G.town].n)} Station</span>`;
   const cond = Math.round(G.train.cond);
   $('#dayChip').innerHTML = `Day ${Math.floor(G.day)} <span style="color:${cond < 40 ? '#b8322f' : cond < 70 ? '#c98f1a' : '#3f8a3e'}">♥${cond}%</span>`;
@@ -1191,7 +1203,7 @@ const PANELS = {
       waiting = o.pax.length ? o.pax.map(p => {
         const free = p.cls === 'rich' ? rich - paxUsed('rich') : seats - paxUsed('std');
         const ok = free >= p.n;
-        return `<div class="card row"><span class="grow">${p.n} × ${p.cls === 'rich' ? '<b>Rich</b> <span class="tag e">LUXURY CAR</span>' : 'Regular'} to <b>${TOWN[p.to].n}</b><div class="small muted">${fmt(p.fare)} each · ${segsFor(route(G.town, p.to).d)} segments away</div></span>
+        return `<div class="card row"><span class="grow">${p.n} × ${p.cls === 'rich' ? '<b>Rich</b> <span class="tag e">LUXURY CAR</span>' : 'Regular'} to <b>${TOWN[p.to].n}</b><div class="small muted">${fmt(p.fare)} each · ${fmtMi(pathMiles(route(G.town, p.to).path))} away</div></span>
           <span class="num">${fmt(p.fare * p.n)}</span><button class="btn go" data-a="board:${p.id}" ${ok ? '' : 'disabled'}>${ok ? 'Board' : p.cls === 'rich' && !rich ? 'Need luxury car' : 'No seats'}</button></div>`;
       }).join('') : '<div class="muted">The platform is empty. More travelers show up each day.</div>';
     }
@@ -1225,10 +1237,10 @@ const PANELS = {
           return `<tr><td>${gImg(g.id)} ${g.n}</td><td class="r num">${fmt(b)}</td><td class="r num">${fmt(s)}</td><td class="r small">${hint}</td></tr>`; }).join('') + '</table>';
       }
       let go = '';
-      if (G.town){ const p = tripPreview(sel); go = `<div class="card hl"><div>${p.segs} segments · ~${p.secs}s · ${p.days} day${p.days === 1 ? "" : "s"}</div><div class="small muted">Coal ${G.freeCoal ? 'partly free' : fmt(p.coal)}${p.path.length > 2 ? ' · via ' + p.path.slice(1, -1).map(x => TOWN[x].n).join(', ') : ''}</div><button class="btn go big" data-a="go:${sel}" style="margin-top:6px;width:100%">All aboard! → ${t.n}</button></div>`; }
+      if (G.town){ const p = tripPreview(sel); go = `<div class="card hl"><div>${fmtMi(p.miles)} · ~${p.secs}s · ${p.days} day${p.days === 1 ? "" : "s"}</div><div class="small muted">Coal ${fmt(p.coal)}${G.freeCoal ? ` (${fmtMi(G.freeCoal)} free)` : ''}${p.path.length > 2 ? ' · via ' + p.path.slice(1, -1).map(x => TOWN[x].n).join(', ') : ''}</div><button class="btn go big" data-a="go:${sel}" style="margin-top:6px;width:100%">All aboard! → ${t.n}</button></div>`; }
       info = `<h3 style="margin:0">${t.n}</h3><div class="small muted">${t.biome[0].toUpperCase() + t.biome.slice(1)} · ${['', 'small', 'medium', 'big'][t.size]} town${t.bank ? ' · bank' : ''}${t.shop ? ' · train yard' : ''}${t.shady ? ' · <span class="dn">lawless</span>' : ''}</div>
         <div style="margin:4px 0">Makes: ${t.prod.map(g => gImg(g)).join(' ')} &nbsp; Wants: ${wants}</div>${go}${pr}`;
-    } else if (G.trip) info = `<div class="card">Heading to <b>${TOWN[G.trip.to].n}</b>. Segment ${G.trip.seg + 1} of ${G.trip.segs}.</div>`;
+    } else if (G.trip) info = `<div class="card">Heading to <b>${TOWN[G.trip.to].n}</b>. ${fmtMi(G.trip.miles * (1 - Math.min(1, (G.trip.seg + G.trip.el / segTime()) / G.trip.segs)))} to go.</div>`;
     return panelShell('Map', G.trip ? 'On the rails' : 'Pick a destination', `<div class="mapwrap"><div class="mapbox" id="mapbox"><canvas id="mapcv"></canvas></div><div class="mapinfo">${info}</div></div>`);
   },
   train(){
@@ -1241,7 +1253,7 @@ const PANELS = {
     return panelShell('Train', `${L.n} · ${G.train.cars.length}/${L.cars} cars`, `
       <div class="card row"><span class="grow"><b>Condition ${Math.round(G.train.cond)}%</b><div class="bar" style="margin-top:3px"><i style="width:${G.train.cond}%;background:${G.train.cond < 40 ? '#b8322f' : G.train.cond < 70 ? '#e8b23a' : '#3f8a3e'}"></i></div><div class="small muted">Below 50% the train runs slow and breaks down more.</div></span>
         ${G.town ? `<button class="btn" data-a="repair" ${cost < 1 || G.money < cost ? 'disabled' : ''}>Repair ${fmt(cost)}</button>` : ''}</div>
-      <div class="card"><b>Engine: ${L.n}</b> <span class="small muted">speed ×${L.speed} · up to ${L.cars} cars · coal ${fmt(coalPerSeg())}/segment</span>
+      <div class="card"><b>Engine: ${L.n}</b> <span class="small muted">speed ×${L.speed} · up to ${L.cars} cars · coal ${fmt(coalPer100())} per 100 mi</span>
         ${next ? `<div class="row" style="margin-top:4px"><span class="grow small">Next: <b>${next.n}</b> (speed ×${next.speed}, ${next.cars} cars)</span>${shop ? `<button class="btn gold" data-a="loco" ${G.money < next.price ? 'disabled' : ''}>${fmt(next.price)}</button>` : `<span class="small muted">${fmt(next.price)} at a train yard</span>`}</div>` : '<div class="small">The finest engine on the rails.</div>'}</div>
       <h3 style="margin:8px 0 6px">Your cars</h3>${carsList}
       <h3 style="margin:8px 0 6px">Train yard</h3>${buy}`);
