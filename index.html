@@ -759,9 +759,9 @@ function carSprite(type, night){
       P(g, b, 1, 6, 58, 21); P(g, shade(b, .22), 1, 6, 58, 2); P(g, shade(b, -.3), 1, 24, 58, 3);
       P(g, roof, 0, 2, 60, 5); P(g, shade(roof, .35), 2, 2, 56, 1); P(g, roof, 2, 1, 56, 1);
       P(g, tr, 1, 20, 58, 1);
-      if (type === 'luxury'){ P(g, tr, 1, 7, 58, 1); for (let i = 0; i < 4; i++){ const x = 5 + i * 13; P(g, '#1c2850', x - 1, 8, 11, 12); P(g, win, x, 9, 9, 10); P(g, winHi, x, 9, 3, 2); P(g, '#b8322f', x, 9, 1, 10); P(g, '#b8322f', x + 8, 9, 1, 10); P(g, '#e8c35a', x, 9, 9, 1); } }
+      if (type === 'luxury'){ P(g, tr, 1, 7, 58, 1); for (let i = 0; i < 4; i++){ const x = 6 + i * 14; P(g, '#1c2850', x - 2, 9, 11, 11); P(g, '#b8322f', x - 1, 10, 1, 9); P(g, '#b8322f', x + 7, 10, 1, 9); P(g, win, x, 10, 7, 9); P(g, winHi, x, 10, 2, 2); P(g, '#e8c35a', x - 1, 10, 9, 1); } }
       else if (type === 'casino'){ for (let i = 0; i < 3; i++){ const x = 8 + i * 17; P(g, roof, x - 1, 10, 10, 8); P(g, win, x, 11, 8, 6); P(g, winHi, x, 11, 3, 2); } for (let x = 4; x < 58; x += 6){ P(g, tr, x, 22, 2, 1); } P(g, tr, 26, 3, 8, 3); }
-      else { for (let i = 0; i < 4; i++){ const x = 5 + i * 13; P(g, roof, x - 1, 8, 11, 12); P(g, win, x, 9, 9, 10); P(g, winHi, x, 9, 3, 2); P(g, winHi, x, 11, 1, 2); } if (type === 'dining') for (let i = 0; i < 4; i++) P(g, '#ffd166', 8 + i * 13, 15, 3, 2); }
+      else { for (let i = 0; i < 5; i++){ const x = 4 + i * 11; P(g, roof, x - 1, 9, 9, 11); P(g, win, x, 10, 7, 9); P(g, winHi, x, 10, 2, 2); P(g, winHi, x, 12, 1, 1); } if (type === 'dining') for (let i = 0; i < 5; i++) P(g, '#ffd166', 6 + i * 11, 15, 3, 2); }
       P(g, '#3a2a1f', 0, 26, 60, 2);
     }
   }));
@@ -1718,13 +1718,14 @@ const WINDOW_ORDER = [2, 0, 4, 1, 3];
 function drawRiders(type, x, y, carIdx){
   const rich = type === 'luxury', same = G.train.cars.slice(0, carIdx).filter(c => c === type).length;
   const seated = rich ? clamp(paxUsed('rich') - same * CARS.luxury.rich, 0, CARS.luxury.rich) : clamp(paxUsed('std') - same * CARS.coach.seats, 0, CARS.coach.seats);
-  const wins = Math.min(4, Math.ceil(seated / (rich ? 1.5 : 2.5))), t = performance.now() / 1000;
+  const n = rich ? 4 : 5, wins = Math.min(n, Math.ceil(seated / (rich ? 1.5 : 2))), t = performance.now() / 1000;
+  const order = rich ? [1, 2, 0, 3] : [2, 0, 4, 1, 3];
   for (let k = 0; k < wins; k++){
-    const i = [1, 2, 0, 3][k], X = x + 1 + 5 + i * 13, Y = y + 1 + 9, seed = carIdx * 11 + i * 3 + (rich ? 50 : 0), L = lookOf(seed, rich);
-    bx.save(); bx.beginPath(); bx.rect(X, Y, 9, 10); bx.clip();
-    const sway = Math.sin(t * 1.3 + seed) > .85 ? 1 : 0, blink = (t * 1.7 + seed * .37) % 4 < .15;
-    P(bx, L.cloth, X + 1, Y + 8, 7, 2); P(bx, shade(L.cloth, .2), X + 1, Y + 8, 2, 2); P(bx, rich ? '#f2efe6' : shade(L.cloth, -.3), X + 4, Y + 8, 1, 2);
-    drawHead(bx, L, X + 1 + sway, Y + 1 + (rich ? 1 : 0), blink);
+    const i = order[k], X = x + 1 + (rich ? 6 + i * 14 : 4 + i * 11), Y = y + 1 + 10, seed = carIdx * 11 + i * 3 + (rich ? 50 : 0), L = lookOf(seed, rich);
+    bx.save(); bx.beginPath(); bx.rect(X, Y, 7, 9); bx.clip();
+    const blink = (t * 1.7 + seed * .37) % 4 < .15;
+    P(bx, L.cloth, X, Y + 7, 7, 2); P(bx, shade(L.cloth, .2), X, Y + 7, 2, 2); P(bx, rich ? '#f2efe6' : shade(L.cloth, -.3), X + 3, Y + 7, 1, 2);
+    drawHead(bx, L, X, Y + (rich ? 1 : 0), blink);
     bx.restore();
   }
 }
