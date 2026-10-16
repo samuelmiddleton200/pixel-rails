@@ -173,6 +173,7 @@ table.mk img{width:22px;height:22px;vertical-align:middle}
 .mapbox .lbl[data-side=l]{transform:translate(calc(-100% - 7px),-50%)}
 .mapbox .lbl[data-side=r]{transform:translate(7px,-50%)}
 .mapbox .lbl[data-side=br]{transform:translate(4px,5px)}
+.mapbox .lbl.far{opacity:.5}
 .mapbox .lbl.here{background:#ffd166}
 .mapbox .lbl.sel{background:#8fd16a}
 .mapinfo{flex:1;overflow-y:auto;min-width:0}
@@ -304,10 +305,10 @@ const fmtMi = m => Math.round(m).toLocaleString('en-US') + ' mi';
 const segsFor = d => Math.max(2, Math.round(d / SEG_LEN));
 
 const LOCOS = [
-  { n:'Little Rusty',    speed:1.0,  cars:3, coal:1.0, price:0,     col:'#2b2d3a', trim:'#b8322f' },
-  { n:'Prairie Runner',  speed:1.25, cars:4, coal:1.2, price:1800,  col:'#2d4a3a', trim:'#d6a83c' },
-  { n:'Iron Duke',       speed:1.5,  cars:6, coal:1.5, price:6000,  col:'#3a2d4a', trim:'#d6a83c' },
-  { n:'Silver Comet',    speed:1.85, cars:8, coal:1.8, price:18000, col:'#5a6478', trim:'#e8eef7' },
+  { n:'Little Rusty',    mph:30, speed:1.0,  cars:3, coal:1.0, price:0,     col:'#2b2d3a', trim:'#b8322f' },
+  { n:'Prairie Runner',  mph:40, speed:1.33, cars:4, coal:1.2, price:1800,  col:'#2d4a3a', trim:'#d6a83c' },
+  { n:'Iron Duke',       mph:50, speed:1.67,  cars:6, coal:1.5, price:6000,  col:'#3a2d4a', trim:'#d6a83c' },
+  { n:'Silver Comet',    mph:60, speed:2.0, cars:8, coal:1.8, price:18000, col:'#5a6478', trim:'#e8eef7' },
 ];
 const CARS = {
   freight: { n:'Freight Car',  price:450,  cap:10,  desc:'Holds 10 crates of cargo.' },
@@ -340,7 +341,7 @@ let G = null;
 function newGame(){
   const seed = Math.floor(Math.random() * 1e9);
   R = mulberry(seed);
-  G = { v:3, seed, money:600, day:1, tod:.1, town:START, trip:null, cargo:{}, paid:{}, pax:[], contracts:[],
+  G = { v:4, seed, money:600, day:1 + 8 / 24, town:START, trip:null, cargo:{}, paid:{}, pax:[], contracts:[],
     train:{ loco:0, cars:['freight','coach'], cond:100 }, crew:[], loan:0, shares:{}, events:[], news:[], mk:{}, offers:{},
     seen:{}, biz:{}, wageDays:0, freeCoal:0, wall:Date.now(), stats:{ trips:0, earned:0, best:0 }, cid:1, nextNewsDay:2 };
   // markets: every world rolls its own prices, so nobody knows the best route ahead of time
@@ -364,7 +365,9 @@ function newGame(){
 }
 
 function save(){ if (!G) return; G.wall = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) {} }
-function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && g.v === 3){ if (g.trip && !g.trip.miles) g.trip.miles = pathMiles(g.trip.path); if (g.freeCoal && g.freeCoal < 20) g.freeCoal *= 150; return g; } } } catch (e) {} return null; }
+function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && (g.v === 3 || g.v === 4)){
+      if (g.v === 3){ g.v = 4; delete g.tod; if (g.trip){ const T = g.trip; T.path = [T.path[0], T.path[1]]; T.to = T.path[1]; T.miles = legMiles(T.from, T.to); T.hours = T.miles / LOCOS[g.train.loco].mph; T.secs = T.hours * SEC_PER_HOUR; T.seg = Math.min(T.seg, T.segs - 1); } }
+      return g; } } } catch (e) {} return null; }
 
 // ---- prices ----
 function price(town, g){
@@ -392,7 +395,13 @@ function skill(role){                                       // mood changes how 
   return clamp(c.skill + (c.mood >= 75 ? 1 : 0) - (c.mood < 40 ? 1 : 0) - (c.mood < 20 ? 1 : 0), 0, 6);
 }
 const coalPrice = () => 11;
-const segTime = () => 6 / loco().speed / (1 + .07 * skill('engineer')) * (G.train.cond < 50 ? 1.25 : 1);
+const SEC_PER_HOUR = 10;
+const mphNow = () => loco().mph * (1 + .07 * skill('engineer')) * (G.train.cond < 50 ? .8 : 1);
+const segTime = () => G.trip ? G.trip.secs / G.trip.segs : 6;          // real seconds between event checkpoints
+const hourOfDay = () => (G.day % 1) * 24;
+const todNow = () => ((hourOfDay() - 6) / 24 + 1) % 1;                   // 0 = 6 AM, .25 noon, .5 6 PM, .75 midnight
+function clockText(){ const mins = Math.floor(hourOfDay() * 60 + 1e-3), H = Math.floor(mins / 60) % 24, m = Math.floor(mins % 60 / 10) * 10; return `${(H + 11) % 12 + 1}:${String(m).padStart(2, '0')} ${H < 12 ? 'AM' : 'PM'}`; }
+const isNeighbor = (a, b) => ADJ[a].some(([t]) => t === b);
 const coalPer100 = () => loco().coal * 5.5 * (1 - .06 * skill('engineer'));     // dollars of coal per 100 miles
 function netWorth(){
   let v = G.money - G.loan;
@@ -417,7 +426,7 @@ function refreshOffers(tid, full){
   o.con = o.con.filter(() => !full && R() < .6);
   while (o.con.length < 1 + Math.min(2, t.size)){
     const to = pick(others).id, g = pick(GOODS), qty = ri(4, 14) - (g.base > 100 ? 2 : 0), d = route(tid, to).d;
-    const due = Math.floor(G.day) + Math.ceil(segsFor(d) * .25) + ri(2, 5);
+    const due = Math.floor(G.day) + Math.ceil(pathMiles(route(tid, to).path) / LOCOS[0].mph / 24) + ri(2, 5);
     const pay = Math.round((qty * g.base * rf(1.7, 2.5) + d * 6) / 5) * 5;
     o.con.push({ id:G.cid++, from:tid, to, good:g.id, qty, due, pay, fine:Math.round(pay * .35 / 5) * 5 });
   }
@@ -476,7 +485,6 @@ function dayTick(){
 function advanceDay(amount){
   const before = Math.floor(G.day);
   G.day += amount; G.wageDays += amount;
-  G.tod = (G.tod + amount) % 1;
   for (let d = before + 1; d <= Math.floor(G.day); d++) dayTick();
 }
 
@@ -494,11 +502,14 @@ function accrue(sec){
 //  trips
 // =====================================================================================
 function tripPreview(to){
-  const r = route(G.town, to), segs = segsFor(r.d);
-  const miles = pathMiles(r.path);
-  return { ...r, segs, miles, coal:Math.round(coalPer100() * Math.max(0, miles - G.freeCoal) / 100), days:segs * .25, secs:Math.round(segs * segTime()) };
+  const path = [G.town, to], miles = legMiles(G.town, to), mph = mphNow(), hours = miles / mph;
+  const segs = Math.max(2, Math.round(hours / 4));                          // a chance of a road event about every 4 hours
+  return { path, segs, miles, mph, hours, secs:hours * SEC_PER_HOUR, coal:Math.round(coalPer100() * Math.max(0, miles - G.freeCoal) / 100) };
 }
+const hoursText = h => h < 1 ? Math.round(h * 60) + ' min' : (Math.round(h * 2) / 2) + ' hr';
+const realText = s => s < 60 ? Math.round(s) + 's' : Math.floor(s / 60) + 'm ' + String(Math.round(s % 60)).padStart(2, '0') + 's';
 function depart(to){
+  if (!isNeighbor(G.town, to)){ toast('No direct track. Go to a connecting city first.', 'r'); return; }
   const p = tripPreview(to);
   if (G.money < p.coal){ toast('Not enough money for coal!', 'r'); return; }
   closePanel();
@@ -508,7 +519,7 @@ function depart(to){
     const f = (i + .5) / p.segs * (p.path.length - 1), k = Math.min(p.path.length - 2, Math.floor(f));
     legs.push(TOWN[f - k < .5 ? p.path[k] : p.path[k + 1]].biome);
   }
-  G.trip = { from:G.town, to, path:p.path, segs:p.segs, miles:p.miles, seg:0, el:0, legs, log:[], tips:0, sick:false };
+  G.trip = { from:G.town, to, path:p.path, segs:p.segs, miles:p.miles, secs:p.secs, hours:p.hours, seg:0, el:0, legs, log:[], tips:0, sick:false };
   G.town = null; G.stats.trips++;
   V.depart();
   save(); refreshHud();
@@ -526,7 +537,6 @@ function segmentDone(){
     if (w){ G.money += w; T.log.push(['Casino winnings', w]); floatText('+' + fmt(w), '#ffd166'); }
   }
   if (skill('cook') && G.pax.length){ const tip = Math.round((paxUsed('std') + paxUsed('rich') * 2) * .6 * skill('cook')); if (tip){ G.money += tip; T.tips += tip; } }
-  advanceDay(.25);
   T.seg++; T.el = 0;
   if (T.seg >= T.segs) return arrive();
   // random events on the road
@@ -535,7 +545,8 @@ function segmentDone(){
 }
 function arrive(){
   const T = G.trip, to = T.to, t = TOWN[to], lines = [];
-  if (T.coal) lines.push([`Coal (${fmtMi(T.miles)})`, -T.coal]);
+  lines.push([`${fmtMi(T.miles)} in ${hoursText(T.hours || T.secs / SEC_PER_HOUR)}`, 0]);
+  if (T.coal) lines.push([`Coal`, -T.coal]);
   lines.push(...T.log);
   G.trip = null; G.town = to;
   // fares
@@ -592,7 +603,7 @@ const ROAD = [
     ] },
   { w:() => 1, title:'Cow on the tracks', text:() => 'A stubborn cow is standing right in the middle of the line, chewing.',
     ch:() => [
-      { t:'Wait it out (lose a quarter day)', f:() => { advanceDay(.25); return 'An hour later she wanders off. Your crew grumbles about the wait.'; } },
+      { t:'Wait it out (lose 2 hours)', f:() => { advanceDay(2 / 24); return 'Two hours later she wanders off. Your crew grumbles about the wait.'; } },
       { t:'Toot the whistle and nudge through', f:() => { if (Math.random() < .55) return 'She trots away indignantly. No harm done.'; G.train.cond = clamp(G.train.cond - 9, 0, 100); return 'Thud. The cowcatcher earns its name. (-9% condition)'; } },
     ] },
   { w:() => 1, title:'Stranded traveler', text:() => 'A traveler waves from beside a broken-down wagon.',
@@ -602,13 +613,13 @@ const ROAD = [
     ] },
   { w:() => 1, title:'Storm', text:() => 'Black clouds roll in and rain hammers the roof.',
     ch:() => [
-      { t:'Slow down (lose a quarter day)', f:() => { advanceDay(.25); return 'You crawl through safely.'; } },
+      { t:'Slow down (lose 3 hours)', f:() => { advanceDay(3 / 24); return 'You crawl through safely.'; } },
       { t:'Push on through', f:() => { G.train.cond = clamp(G.train.cond - ri(5, 12), 0, 100); const k = cargoKeys().filter(g => ['grain','cotton','oranges'].includes(g));
         if (k.length && Math.random() < .5){ const g = pick(k), n = lose(g, .2); return `Leaks in the freight car! ${n} ${GOOD[g].n} ruined.`; } return 'The train takes a beating but you keep your schedule.'; } },
     ] },
   { w:() => G.train.cond < 70 ? 1.5 : .5, title:'Hot axle', text:() => 'Smoke is pouring off a wheel bearing. The train is getting worn.',
     ch:() => [
-      { t:'Stop and let it cool (lose a quarter day)', f:() => { advanceDay(.25); G.train.cond = clamp(G.train.cond + 3, 0, 100); return 'You patch it up as best you can.'; } },
+      { t:'Stop and let it cool (lose 2 hours)', f:() => { advanceDay(2 / 24); G.train.cond = clamp(G.train.cond + 3, 0, 100); return 'You patch it up as best you can.'; } },
       { t:'Keep going and hope', f:() => { if (Math.random() < .5) return 'It holds. Phew.'; G.train.cond = clamp(G.train.cond - 15, 0, 100); return 'CRACK. That did not sound good. (-15% condition)'; } },
     ] },
   { w:() => 1, title:'Lucky find', text:() => 'Abandoned crates lie beside the tracks, half buried in weeds.',
@@ -932,6 +943,7 @@ function update(dt){
   if (G.trip && !paused){
     const T = G.trip;
     T.el += dt;
+    advanceDay(dt / SEC_PER_HOUR / 24);
     // approach: the station appears off the right edge while we cruise, then we brake and stop right at the platform.
     // it is timed so the stop lands exactly when the trip clock runs out
     if (!V.decel){
@@ -991,7 +1003,7 @@ function drawLayer(img, factor, alpha){
   bx.globalAlpha = 1;
 }
 function drawScene(){
-  const tod = G.trip ? (G.tod + G.trip.el / segTime() * .25) % 1 : G.tod;
+  const tod = todNow();
   const [tint, ta, night] = lightAt(tod);
   const B = BIOMES[V.biome], PB = V.prevBiome ? BIOMES[V.prevBiome] : B, f = V.fade;
   // sky bands
@@ -1141,7 +1153,7 @@ function refreshHud(){
     w.innerHTML = `<span>${esc(TOWN[T.from].n)} → ${esc(TOWN[T.to].n)}</span><span class="prog"><b style="width:${(f * 100).toFixed(1)}%"></b></span><span class="mi">${fmtMi(T.miles * (1 - f))} left</span>`;
   } else w.innerHTML = `<span>${esc(TOWN[G.town].n)} Station</span>`;
   const cond = Math.round(G.train.cond);
-  $('#dayChip').innerHTML = `Day ${Math.floor(G.day)} <span style="color:${cond < 40 ? '#b8322f' : cond < 70 ? '#c98f1a' : '#3f8a3e'}">♥${cond}%</span>`;
+  $('#dayChip').innerHTML = `Day ${Math.floor(G.day)} · ${clockText()} <span style="color:${cond < 40 ? '#b8322f' : cond < 70 ? '#c98f1a' : '#3f8a3e'}">♥${cond}%</span>`;
   // which buttons work right now
   const away = !!G.trip;
   for (const b of document.querySelectorAll('.tb')){
@@ -1237,7 +1249,8 @@ const PANELS = {
           return `<tr><td>${gImg(g.id)} ${g.n}</td><td class="r num">${fmt(b)}</td><td class="r num">${fmt(s)}</td><td class="r small">${hint}</td></tr>`; }).join('') + '</table>';
       }
       let go = '';
-      if (G.town){ const p = tripPreview(sel); go = `<div class="card hl"><div>${fmtMi(p.miles)} · ~${p.secs}s · ${p.days} day${p.days === 1 ? "" : "s"}</div><div class="small muted">Coal ${fmt(p.coal)}${G.freeCoal ? ` (${fmtMi(G.freeCoal)} free)` : ''}${p.path.length > 2 ? ' · via ' + p.path.slice(1, -1).map(x => TOWN[x].n).join(', ') : ''}</div><button class="btn go big" data-a="go:${sel}" style="margin-top:6px;width:100%">All aboard! → ${t.n}</button></div>`; }
+      if (G.town && isNeighbor(G.town, sel)){ const p = tripPreview(sel); go = `<div class="card hl"><div><b>${fmtMi(p.miles)}</b> at ${Math.round(p.mph)} mph · ${hoursText(p.hours)} on the clock</div><div class="small muted">About ${realText(p.secs)} of riding · coal ${fmt(p.coal)}${G.freeCoal ? ` (${fmtMi(G.freeCoal)} free)` : ''}</div><button class="btn go big" data-a="go:${sel}" style="margin-top:6px;width:100%">All aboard! → ${t.n}</button></div>`; }
+      else if (G.town){ const r = route(G.town, sel).path; go = `<div class="card">No direct track from ${TOWN[G.town].n}. Stop in <b>${TOWN[r[1]].n}</b> first${r.length > 3 ? ` (shortest way: ${r.slice(1, -1).map(x => TOWN[x].n).join(' → ')})` : ''}.</div>`; }
       info = `<h3 style="margin:0">${t.n}</h3><div class="small muted">${t.biome[0].toUpperCase() + t.biome.slice(1)} · ${['', 'small', 'medium', 'big'][t.size]} town${t.bank ? ' · bank' : ''}${t.shop ? ' · train yard' : ''}${t.shady ? ' · <span class="dn">lawless</span>' : ''}</div>
         <div style="margin:4px 0">Makes: ${t.prod.map(g => gImg(g)).join(' ')} &nbsp; Wants: ${wants}</div>${go}${pr}`;
     } else if (G.trip) info = `<div class="card">Heading to <b>${TOWN[G.trip.to].n}</b>. ${fmtMi(G.trip.miles * (1 - Math.min(1, (G.trip.seg + G.trip.el / segTime()) / G.trip.segs)))} to go.</div>`;
@@ -1253,8 +1266,8 @@ const PANELS = {
     return panelShell('Train', `${L.n} · ${G.train.cars.length}/${L.cars} cars`, `
       <div class="card row"><span class="grow"><b>Condition ${Math.round(G.train.cond)}%</b><div class="bar" style="margin-top:3px"><i style="width:${G.train.cond}%;background:${G.train.cond < 40 ? '#b8322f' : G.train.cond < 70 ? '#e8b23a' : '#3f8a3e'}"></i></div><div class="small muted">Below 50% the train runs slow and breaks down more.</div></span>
         ${G.town ? `<button class="btn" data-a="repair" ${cost < 1 || G.money < cost ? 'disabled' : ''}>Repair ${fmt(cost)}</button>` : ''}</div>
-      <div class="card"><b>Engine: ${L.n}</b> <span class="small muted">speed ×${L.speed} · up to ${L.cars} cars · coal ${fmt(coalPer100())} per 100 mi</span>
-        ${next ? `<div class="row" style="margin-top:4px"><span class="grow small">Next: <b>${next.n}</b> (speed ×${next.speed}, ${next.cars} cars)</span>${shop ? `<button class="btn gold" data-a="loco" ${G.money < next.price ? 'disabled' : ''}>${fmt(next.price)}</button>` : `<span class="small muted">${fmt(next.price)} at a train yard</span>`}</div>` : '<div class="small">The finest engine on the rails.</div>'}</div>
+      <div class="card"><b>Engine: ${L.n}</b> <span class="small muted">${L.mph} mph · up to ${L.cars} cars · coal ${fmt(coalPer100())} per 100 mi</span>
+        ${next ? `<div class="row" style="margin-top:4px"><span class="grow small">Next: <b>${next.n}</b> (${next.mph} mph, ${next.cars} cars)</span>${shop ? `<button class="btn gold" data-a="loco" ${G.money < next.price ? 'disabled' : ''}>${fmt(next.price)}</button>` : `<span class="small muted">${fmt(next.price)} at a train yard</span>`}</div>` : '<div class="small">The finest engine on the rails.</div>'}</div>
       <h3 style="margin:8px 0 6px">Your cars</h3>${carsList}
       <h3 style="margin:8px 0 6px">Train yard</h3>${buy}`);
   },
@@ -1380,7 +1393,9 @@ function drawMap(){
     for (let i = 0; i <= n; i++){ const x = Math.round(x1 + (x2 - x1) * i / n), y = Math.round(y1 + (y2 - y1) * i / n); P(g, '#5a3a22', x, y, 1, 1); if (i % 3 === 0) P(g, '#8a6a4a', x - (Math.abs(y2 - y1) > Math.abs(x2 - x1) ? 1 : 0), y - (Math.abs(y2 - y1) > Math.abs(x2 - x1) ? 0 : 1), Math.abs(y2 - y1) > Math.abs(x2 - x1) ? 3 : 1, Math.abs(y2 - y1) > Math.abs(x2 - x1) ? 1 : 3); }
   }
   // planned route
-  const sel = tabs.map && G.town && tabs.map !== G.town ? route(G.town, tabs.map).path : G.trip ? G.trip.path : null;
+  const sel = tabs.map && G.town && isNeighbor(G.town, tabs.map) ? [G.town, tabs.map] : G.trip ? G.trip.path : null;
+  // track you can take right now is drawn brighter
+  if (G.town) for (const [b] of ADJ[G.town]){ const x1 = X(G.town), y1 = Y(G.town), x2 = X(b), y2 = Y(b), n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)); for (let i = 0; i <= n; i++) P(g, '#fff3c0', Math.round(x1 + (x2 - x1) * i / n), Math.round(y1 + (y2 - y1) * i / n), 1, 1); }
   if (sel) for (let k = 0; k < sel.length - 1; k++){ const x1 = X(sel[k]), y1 = Y(sel[k]), x2 = X(sel[k + 1]), y2 = Y(sel[k + 1]), n = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)); for (let i = 0; i <= n; i++) P(g, '#e8b23a', Math.round(x1 + (x2 - x1) * i / n) - 1, Math.round(y1 + (y2 - y1) * i / n) - 1, 2, 2); }
   // towns
   for (const t of TOWNS){ const x = X(t.id), y = Y(t.id); P(g, '#24150f', x - 3, y - 3, 7, 7); P(g, t.roof, x - 2, y - 2, 5, 5); P(g, shade(t.roof, .35), x - 2, y - 2, 5, 1); }
@@ -1393,7 +1408,7 @@ function drawMap(){
   // labels (HTML, crisp)
   box.querySelectorAll('.lbl').forEach(l => l.remove());
   for (const t of TOWNS){
-    const l = document.createElement('div'); l.className = 'lbl' + (t.id === G.town ? ' here' : t.id === tabs.map ? ' sel' : '');
+    const l = document.createElement('div'); l.className = 'lbl' + (t.id === G.town ? ' here' : t.id === tabs.map ? ' sel' : '') + (G.town && t.id !== G.town && !isNeighbor(G.town, t.id) ? ' far' : '');
     l.textContent = t.n; l.dataset.side = t.lbl || 'b'; l.style.left = (X(t.id) * S / dpr) + 'px'; l.style.top = (Y(t.id) * S / dpr) + 'px'; box.appendChild(l);
   }
   c.onclick = e => {
@@ -1466,7 +1481,7 @@ addEventListener('resize', () => { resize(); if (panelName === 'map') drawMap();
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else if (G){ const sec = Math.min(8 * 3600, Math.max(0, (Date.now() - G.wall) / 1000)); if (sec > 30){ const v = Math.round(incomePerHour() * sec / 3600); if (v > 0){ G.money += v; toast(`Your businesses earned ${fmt(v)} while you were away`, 'g'); } } G.wall = Date.now(); } });
 addEventListener('pagehide', save);
 // test hooks
-window.__pr = { get G(){ return G; }, V, depart, openPanel, closePanel, segmentDone, roadEvent, refreshHud, newGame:() => { newGame(); buildSprites(); V.arrive(G.town); } };
+window.__pr = { get G(){ return G; }, V, pickMap:id => { tabs.map = id; renderPanel(); }, depart, openPanel, closePanel, segmentDone, roadEvent, refreshHud, newGame:() => { newGame(); buildSprites(); V.arrive(G.town); } };
 boot();
 })();
 </script>
