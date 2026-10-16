@@ -411,7 +411,7 @@ function clockText(){ const mins = Math.floor(hourOfDay() * 60 + 1e-3), H = Math
 const isNeighbor = (a, b) => ADJ[a].some(([t]) => t === b);
 const burnPer100 = () => loco().coal * (1 - .06 * skill('engineer'));                 // tons of engine coal per 100 miles
 const fuelCap = () => loco().tank + G.train.cars.filter(c => c === 'tender').length * CARS.tender.fuel;
-const fuelPrice = t => buyP(t, 'coal');                                                // engine coal costs what coal costs in that town
+const fuelPrice = t => Math.max(2, Math.round(price(t, 'coal') * .4));                 // engine-grade coal: 40% of the town's coal price, so coal towns are the cheap fill-ups
 function netWorth(){
   let v = G.money - G.loan;
   for (const t in G.biz) for (const b of G.biz[t]) v += b.owned * b.price * .7;
