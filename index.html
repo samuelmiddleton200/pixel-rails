@@ -546,6 +546,18 @@ function depart(to){
   V.depart();
   save(); refreshHud();
 }
+// reverse the trip: from and to swap, and the new distance is how far you've already come
+function turnBack(){
+  const T = G.trip; if (!T || V.decel) return;
+  const back = T.miles * Math.min(1, (T.seg + T.el / segTime()) / T.segs), mph = mphNow(), hours = back / mph, need = back / 100 * burnPer100();
+  if (back < 1) return;
+  if (G.fuel + 1e-6 < need){ toast('Not enough coal to make it back!', 'r'); return; }
+  const segs = Math.max(1, Math.round(hours / 4));
+  Object.assign(T, { from:T.to, to:T.from, path:[T.to, T.from], miles:back, hours, secs:hours * SEC_PER_HOUR, segs, seg:0, el:0, fuel:need, board:[], boardT:0, reserved:null });
+  for (let i = 0; i < 3; i++) T.board.push(makeGroup(T.to));
+  V.req = null;
+  closePanel(); toast(`Turning back to ${TOWN[T.to].n}: ${fmtMi(back)}`, 'g'); save(); refreshHud();
+}
 function segmentDone(){
   const T = G.trip;
   G.train.cond = clamp(G.train.cond - rf(.7, 1.8), 0, 100);
@@ -1508,6 +1520,12 @@ const PANELS = {
       info = `<h3 style="margin:0">${t.n}</h3><div class="small muted">${BIOMES[t.biome].n} · ${['', 'small', 'medium', 'big'][t.size]} town${t.bank ? ' · bank' : ''}${t.shop ? ' · train yard' : ''}${t.shady ? ' · <span class="dn">lawless</span>' : ''}</div>
         <div style="margin:4px 0">Makes: ${t.prod.map(g => gImg(g)).join(' ')} &nbsp; Wants: ${wants}</div>${go}${pr}`;
     } else if (G.trip) info = `<div class="card">Heading to <b>${TOWN[G.trip.to].n}</b>. ${fmtMi(G.trip.miles * (1 - Math.min(1, (G.trip.seg + G.trip.el / segTime()) / G.trip.segs)))} to go.</div>`;
+    if (G.trip){       // turn back to the station you came from: the miles back are the miles you've come
+      const T = G.trip, back = T.miles * Math.min(1, (T.seg + T.el / segTime()) / T.segs), need = back / 100 * burnPer100();
+      const ok = !V.decel && back >= 1 && G.fuel + 1e-6 >= need;
+      info = `<div class="card row"><span class="grow">Turn back to <b>${TOWN[T.from].n}</b><div class="small muted">${fmtMi(back)} back · ${hoursText(back / mphNow())} · burns ${need.toFixed(1)} t${T.reserved ? ' · your reservation is lost' : ''}</div></span>
+        <button class="btn bad" data-a="turn" ${ok ? '' : 'disabled'}>${V.decel ? 'Pulling in' : 'Turn back'}</button></div>` + info;
+    }
     return panelShell('Map', G.trip ? 'On the rails' : 'Pick a destination', `<div class="mapwrap"><div class="mapbox" id="mapbox"><canvas id="mapcv"></canvas></div><div class="mapinfo">${info}</div></div>`);
   },
   train(){
@@ -1600,6 +1618,7 @@ $('#panel').addEventListener('click', e => {
       T.board.splice(T.board.indexOf(g), 1); T.reserved = g; toast(`Reserved ${g.n} to ${TOWN[g.to].n}. No changes now!`, 'g'); break; }
     case 'kick': { const k = G.pax.find(q => q.id === +x); if (!k) break; const cost = k.n * (k.cls === 'rich' ? 50 : 25); if (G.money < cost) break;
       G.money -= cost; G.pax.splice(G.pax.indexOf(k), 1); toast(`${k.n} passenger${k.n > 1 ? 's' : ''} kicked off. Refunded ${fmt(cost)}`, 'r'); break; }
+    case 'turn': turnBack(); return;
     case 'repair': { const cost = Math.ceil((100 - G.train.cond) * 3.2); if (G.money >= cost){ G.money -= cost; G.train.cond = 100; toast('Good as new!', 'g'); } break; }
     case 'buycar': { const c = CARS[x]; if (G.money >= c.price && G.train.cars.length < loco().cars){ G.money -= c.price; G.train.cars.push(x); sortCars(); toast(`${c.n} coupled on!`, 'g'); if (V.stationTown) V.placeStation(); } break; }
     case 'sellcar': { const i = +x, c = G.train.cars[i];
