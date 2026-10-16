@@ -549,7 +549,6 @@ function depart(to){
 function segmentDone(){
   const T = G.trip;
   G.train.cond = clamp(G.train.cond - rf(.7, 1.8), 0, 100);
-  }
   if (skill('cook') && G.pax.length){ const tip = Math.round((paxUsed('std') + paxUsed('rich') * 2) * .6 * skill('cook')); if (tip){ G.money += tip; T.tips += tip; } }
   T.seg++; T.el = 0;
   if (T.seg >= T.segs) return arrive();
