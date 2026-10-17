@@ -125,6 +125,10 @@ img.px{image-rendering:pixelated}
 .tb{position:relative;width:58px;height:50px;border:3px solid var(--ink);border-radius:9px;background:linear-gradient(#d8a873,#b57f4b);
   box-shadow:inset 0 3px 0 #ecc694,inset 0 -4px 0 #8a5a34,0 3px 0 rgba(0,0,0,.35);display:grid;place-items:center;padding:0}
 .tb img{width:36px;height:36px}
+.tb{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.tb .em{font-size:23px;line-height:1;filter:drop-shadow(0 1px 0 rgba(0,0,0,.25))}
+.tb .lb{font:700 8px var(--px);color:#3a2010;letter-spacing:.02em}
+.jicon{font-size:17px;width:22px;text-align:center}
 .tb:active{transform:translateY(2px);box-shadow:inset 0 3px 0 #ecc694,inset 0 -2px 0 #8a5a34}
 .tb.on{background:linear-gradient(#f2cf8e,#d9a560)}
 .tb:disabled{filter:grayscale(.8) brightness(.7);cursor:default}
@@ -220,6 +224,10 @@ table.mk img{width:22px;height:22px;vertical-align:middle}
   #bar{gap:5px;padding-bottom:calc(env(safe-area-inset-bottom) + 4px)}
   .tb{width:48px;height:40px;border-width:2px;border-radius:8px}
   .tb img{width:28px;height:28px}
+  .tb{width:62px}
+  .tb .lb{letter-spacing:0}
+  .tb .em{font-size:19px}
+  .tb .lb{font-size:7px}
   .tb .dot{min-width:15px;height:15px;font-size:9px;line-height:12px;top:-5px;right:-5px}
   #panel{top:calc(env(safe-area-inset-top) + 34px);bottom:calc(env(safe-area-inset-bottom) + 50px);border-width:2px}
   .ph{padding:3px 6px 3px 10px;gap:8px;border-bottom-width:2px}
@@ -422,6 +430,7 @@ function newGame(){
 
 function save(){ if (!G) return; G.wall = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) {} }
 function load(){ try { const s = localStorage.getItem(SAVE_KEY); if (s) { const g = JSON.parse(s); if (g && (g.v === 3 || g.v === 4)){
+      g.crew = [];
       if (g.fuel == null){ g.fuel = LOCOS[g.train.loco].tank; delete g.freeCoal; if (g.trip && g.trip.fuel == null) g.trip.fuel = 0; }
       if (g.v === 3){ g.v = 4; delete g.tod; if (g.trip){ const T = g.trip; T.path = [T.path[0], T.path[1]]; T.to = T.path[1]; T.miles = legMiles(T.from, T.to); T.hours = T.miles / LOCOS[g.train.loco].mph; T.secs = T.hours * SEC_PER_HOUR; T.seg = Math.min(T.seg, T.segs - 1); } }
       if (g.train.cars.includes('casino')){ const n = g.train.cars.filter(c => c === 'casino').length; g.train.cars = g.train.cars.filter(c => c !== 'casino'); g.money += n * 1400; }
@@ -451,7 +460,12 @@ const moonUsed = () => G.cargo.moon || 0;
 const paxUsed = cls => G.pax.filter(p => p.cls === cls).reduce((s, p) => s + p.n, 0);
 const has = c => G.train.cars.includes(c);
 function crew(role){ return G.crew.find(c => c.role === role); }
-function skill(role){                                       // mood changes how hard they work
+// a passenger's fare: $15 plus 14 cents a mile along the track; rich travelers pay 3-4x
+function paxFare(from, to, rich){ const mi = pathMiles(route(from, to).path); return Math.round((15 + mi * .14) * (rich ? rf(3, 4) : rf(.9, 1.15))); }
+const seatsFree = cls => (cls === 'rich' ? richOf() : seatsOf()) - paxUsed(cls);
+function skill(role){ return 0;   // crew removed (user)
+}
+function oldSkill(role){                                       // mood changes how hard they work
   const c = crew(role); if (!c) return 0;
   return clamp(c.skill + (c.mood >= 75 ? 1 : 0) - (c.mood < 40 ? 1 : 0) - (c.mood < 20 ? 1 : 0), 0, 6);
 }
@@ -479,11 +493,10 @@ function refreshOffers(tid, full){
   const others = TOWNS.filter(x => x.id !== tid);
   // passengers
   o.pax = o.pax.filter(() => !full && R() < .5);
-  const nPax = ri(2, 2 + t.size) - o.pax.length;
+  const nPax = ri(2, 3 + t.size) - o.pax.length;
   for (let i = 0; i < nPax; i++){
     const to = pick(others).id, d = route(tid, to).d, rich = R() < .22 + .06 * t.size;
-    const fare = Math.round((10 + d * 1.15) * (rich ? rf(3, 4) : rf(.9, 1.15)));     // ~45% more than the first build (user: passengers a bit better, not crazy)
-    o.pax.push({ id:G.cid++, to, cls:rich ? 'rich' : 'std', n:rich ? ri(1, 3) : ri(2, 7), fare });
+    o.pax.push({ id:G.cid++, to, cls:rich ? 'rich' : 'std', n:rich ? ri(2, 8) : ri(5, 20), fare:paxFare(tid, to, rich) });
   }
   // contracts
   o.con = o.con.filter(() => !full && R() < .6);
@@ -624,8 +637,9 @@ function arrive(){
   // the group you reserved is waiting on the platform
   if (T.reserved){ const r = T.reserved; delete r.life; delete r.max;
     const free = r.cls === 'rich' ? richOf() - paxUsed('rich') : seatsOf() - paxUsed('std');
-    if (free >= r.n){ G.pax.push(r); lines.push([`Your reservation boarded: ${r.n} to ${TOWN[r.to].n}`, 0]); }
-    else { G.offers[to].pax.unshift(r); lines.push([`Your reserved group is waiting (no seats)`, 0]); } }
+    const k = Math.min(r.n, Math.max(0, free));
+    if (k > 0) G.pax.push({ ...r, n:k }); if (k < r.n) G.offers[to].pax.unshift({ ...r, id:G.cid++, n:r.n - k });
+    lines.push([k ? `Your reservation boarded: ${k} to ${TOWN[r.to].n}` : 'Your reserved group is waiting (no seats)', 0]); }
   if (fares) lines.push(['Passenger fares', fares]);
   if (T.tips) lines.push(['Tips (cook)', 0, T.tips]);
   // contracts
@@ -1171,12 +1185,13 @@ function update(dt){
     // it is timed so the stop lands exactly when the trip clock runs out
     if (!V.decel){
       const left = (T.segs - T.seg - 1) * segTime() + (segTime() - T.el);
-      const v0 = Math.max(20, V.v), D = 2.6, stopX = stationStopX(), dist = BW + 12 - stopX;
+      const v0 = Math.max(20, V.v), D = 2.6 + 1.7 * (loco().speed - 1), stopX = stationStopX(), dist = BW + 12 - stopX;   // faster engines brake earlier
       const cruise = Math.max(0, (dist - v0 * D / 2) / v0);
       if (left <= cruise + D){
-        V.decel = { t:0, D, v0, cruise:Math.max(0, left - D), x0:V.x };
+        const Dd = Math.min(D, left * .95);
+        V.decel = { t:0, D:Dd, v0, cruise:Math.max(0, left - Dd), x0:V.x };
         // place the station so we stop at it wherever the clock says we are
-        const s = v0 * V.decel.cruise + v0 * D / 2;
+        const s = v0 * V.decel.cruise + v0 * Dd / 2;
         if (V.station !== null){ V.oldStation = V.station; V.oldTown = V.stationTown; }
         V.station = V.x + s + stopX; V.stationTown = T.to;
       }
@@ -1194,7 +1209,7 @@ function update(dt){
     V.x = d.x0 + s - V.v * dt;                                   // the line below adds v*dt back
   }
   else if (G.trip){
-    const target = G.paused ? 0 : paused ? CRUISE * .35 : CRUISE * (.8 + .2 * loco().speed);
+    const target = G.paused ? 0 : paused ? CRUISE * .35 : CRUISE * loco().speed;           // 30 mph = 1x, 45 = 1.5x, 60 = 2x, 85 = 2.8x
     V.v += (target - V.v) * Math.min(1, dt * (V.accel > 0 ? .9 : 1.5)); V.accel = Math.max(0, V.accel - dt);
   } else V.v = 0;
   V.x += V.v * dt;
@@ -1561,8 +1576,8 @@ function floatText(txt, col){ V.float.push({ txt, col, x:trainFront() - 40, y:tr
 // =====================================================================================
 let dispMoney = 0, panelName = null;
 $('#coinImg').src = ICONS.coin;
-const BAR = [['market','Market'],['pax','Passengers'],['con','Contracts'],['map','Map'],['train','Train'],['crew','Crew'],['bank','Bank'],['gear','Settings']];
-$('#bar').innerHTML = BAR.map(([k, n]) => `<button class="tb" data-p="${k}" title="${n}" aria-label="${n}"><img class="px" src="${ICONS[k === 'pax' ? 'pax' : k]}" alt=""></button>`).join('');
+const BAR = [['market', 'Market', '🛒'], ['jobs', 'Contracts', '📜'], ['map', 'Map', '🗺️'], ['train', 'Train', '🚂'], ['bank', 'Bank', '🏦'], ['gear', 'Settings', '⚙️']];
+$('#bar').innerHTML = BAR.map(([k, n, e]) => `<button class="tb" data-p="${k}" aria-label="${n}"><span class="em">${e}</span><span class="lb">${n}</span></button>`).join('');
 $('#bar').addEventListener('click', e => { const b = e.target.closest('.tb'); if (!b || b.disabled) return; const k = b.dataset.p; if (panelName === k) closePanel(); else openPanel(k); });
 
 function refreshHud(){
@@ -1584,8 +1599,7 @@ function refreshHud(){
     const k = b.dataset.p;     b.classList.toggle('on', panelName === k);
     const old = b.querySelector('.dot'); if (old) old.remove();
     let dot = 0;
-    if (!away && k === 'pax') dot = G.offers[G.town].pax.length;
-    if (!away && k === 'con') dot = G.offers[G.town].con.length;
+    if (!away && k === 'jobs') dot = G.offers[G.town].pax.length + G.offers[G.town].con.length;
     if (dot) b.insertAdjacentHTML('beforeend', `<span class="dot">${dot}</span>`);
   }
 }
@@ -1594,7 +1608,7 @@ $('#pauseBtn').addEventListener('click', () => { if (!G || !G.trip) return; G.pa
 function showNews(txt){ const n = $('#news'); n.innerHTML = `<b>NEWS:</b> ${esc(txt)}`; n.style.opacity = 1; newsTimer = 9; }
 function toast(txt, cls = ''){ const d = document.createElement('div'); d.className = 'toast ' + cls; d.textContent = txt; $('#toasts').appendChild(d); setTimeout(() => d.remove(), 3200); }
 
-function openPanel(k){ panelName = k; $('#panel').hidden = false; renderPanel(); refreshHud(); }
+function openPanel(k){ if (k === 'pax' || k === 'con') k = 'jobs'; panelName = k; $('#panel').hidden = false; renderPanel(); refreshHud(); }
 function rerender(){ if (panelName) renderPanel(); }
 function closePanel(){ panelName = null; $('#panel').hidden = true; refreshHud(); }
 let tabs = { market:'buy', bank:'invest', train:'cars', map:null };
@@ -1634,34 +1648,28 @@ const PANELS = {
       <table class="mk"><tr><th>Good</th><th class="r">Buy</th><th class="r">Sell</th><th class="r">Have</th><th class="r"></th><th class="r"></th></tr>${rows}</table>
       ${nEv ? '' : ''}${newsList(4)}`);
   },
-  pax(){
-    const seats = seatsOf(), rich = richOf();
-    const onboard = G.pax.length ? G.pax.map(p => { const cost = p.n * (p.cls === 'rich' ? 50 : 25);
-      return `<div class="card row"><span class="grow">${p.n} × ${p.cls === 'rich' ? '<b>Rich</b>' : 'Regular'} to <b>${TOWN[p.to].n}</b> <span class="small muted">· ${awayText(p.to)}</span></span><span class="num">${fmt(p.fare * p.n)}</span><button class="btn bad" data-a="kick:${p.id}" ${G.money < cost ? 'disabled' : ''}>Kick off -${fmt(cost)}</button></div>`; }).join('') : '<div class="muted">Nobody aboard.</div>';
-    let waiting = '';
-    if (!G.trip){
+  jobs(){
+    const seats = seatsOf(), rich = richOf(), T = G.trip;
+    // everything you've committed to, people and goods together
+    const mine = [];
+    for (const p of G.pax){ const cost = p.n * (p.cls === 'rich' ? 50 : 25);
+      mine.push(`<div class="card row"><span class="jicon">${p.cls === 'rich' ? '🎩' : '🧳'}</span><span class="grow"><b>${p.n} ${p.cls === 'rich' ? 'rich passenger' : 'passenger'}${p.n > 1 ? 's' : ''}</b> to <b>${TOWN[p.to].n}</b><div class="small muted">${awayText(p.to)} · ${fmt(p.fare)} each · on board</div></span><span class="num up">${fmt(p.fare * p.n)}</span><button class="btn bad" data-a="kick:${p.id}" ${G.money < cost ? 'disabled' : ''}>Kick -${fmt(cost)}</button></div>`); }
+    if (T && T.reserved){ const r = T.reserved; mine.push(`<div class="card hl row"><span class="jicon">🎫</span><span class="grow"><b>Reserved: ${r.n} ${r.cls === 'rich' ? 'rich ' : ''}passenger${r.n > 1 ? 's' : ''}</b> to <b>${TOWN[r.to].n}</b><div class="small muted">Board at ${TOWN[T.to].n} · locked in</div></span><span class="num up">${fmt(r.fare * r.n)}</span></div>`); }
+    for (const c of G.contracts){ const left = c.due - Math.floor(G.day), have = G.cargo[c.good] || 0;
+      mine.push(`<div class="card row">${gImg(c.good)}<span class="grow"><b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b><div class="small ${left <= 1 ? 'dn' : 'muted'}">${awayText(c.to)} · due day ${c.due} (${left <= 0 ? 'today!' : left + ' days left'}) · have ${have}/${c.qty} · late fine ${fmt(c.fine)}</div></span><span class="num up">${fmt(c.pay)}</span></div>`); }
+    const top = `<h3 style="margin:2px 0 6px">Your contracts</h3>${mine.join('') || '<div class="muted">Nothing yet. Pick up passengers or a freight job below.</div>'}`;
+    let below = '';
+    if (T) below = reservationBoard() + '<div class="small muted" style="margin-top:6px">Freight jobs are posted at stations.</div>';
+    else {
       const o = G.offers[G.town];
-      waiting = o.pax.length ? o.pax.map(p => {
-        const free = p.cls === 'rich' ? rich - paxUsed('rich') : seats - paxUsed('std');
-        const ok = free >= p.n;
-        return `<div class="card row"><span class="grow">${p.n} × ${p.cls === 'rich' ? '<b>Rich</b> <span class="tag e">LUXURY CAR</span>' : 'Regular'} to <b>${TOWN[p.to].n}</b><div class="small muted">${fmt(p.fare)} each · ${awayText(p.to)}</div></span>
-          <span class="num">${fmt(p.fare * p.n)}</span><button class="btn go" data-a="board:${p.id}" ${ok ? '' : 'disabled'}>${ok ? 'Board' : p.cls === 'rich' && !rich ? 'Need luxury car' : 'No seats'}</button></div>`;
-      }).join('') : '<div class="muted">The platform is empty. More travelers show up each day.</div>';
+      const people = o.pax.length ? o.pax.map(p => { const free = seatsFree(p.cls), k = Math.min(free, p.n);
+        const label = k >= p.n ? 'Board' : k > 0 ? `Take ${k} of ${p.n} (${fmt(p.fare * k)})` : p.cls === 'rich' && !rich ? 'Need luxury car' : 'No seats';
+        return `<div class="card row"><span class="jicon">${p.cls === 'rich' ? '🎩' : '🧳'}</span><span class="grow"><b>${p.n} ${p.cls === 'rich' ? 'rich passenger' : 'passenger'}${p.n > 1 ? 's' : ''}</b> to <b>${TOWN[p.to].n}</b><div class="small muted">${awayText(p.to)} · ${fmt(p.fare)} each</div></span>
+          <span class="num">${fmt(p.fare * p.n)}</span><button class="btn go" data-a="board:${p.id}" ${k > 0 ? '' : 'disabled'}>${label}</button></div>`; }).join('') : '<div class="muted">Nobody waiting right now.</div>';
+      const freight = o.con.map(c => `<div class="card row">${gImg(c.good)}<span class="grow">Deliver <b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b><div class="small muted">${awayText(c.to)} · by day ${c.due} · late fine ${fmt(c.fine)} · you buy the goods</div></span><span class="num up">${fmt(c.pay)}</span><button class="btn go" data-a="take:${c.id}" ${G.contracts.length >= 4 ? 'disabled' : ''}>Accept</button></div>`).join('') || '<div class="muted">No freight jobs today.</div>';
+      below = `<h3 style="margin:10px 0 6px">Passengers at ${TOWN[G.town].n}</h3>${people}<h3 style="margin:10px 0 6px">Freight jobs <span class="small muted">(${G.contracts.length}/4 taken)</span></h3>${freight}`;
     }
-    return panelShell('Passengers', `Seats ${paxUsed('std')}/${seats} · Luxury ${paxUsed('rich')}/${rich}`,
-      (G.trip ? reservationBoard() : `<h3 style="margin:2px 0 6px">Waiting at ${TOWN[G.town].n}</h3>${waiting}`) + `<h3 style="margin:10px 0 6px">On board</h3>${onboard}<div class="small muted">Fares are paid when you stop at their station.</div>`);
-  },
-  con(){
-    const act = G.contracts.length ? G.contracts.map(c => {
-      const left = c.due - Math.floor(G.day), have = G.cargo[c.good] || 0;
-      return `<div class="card row">${gImg(c.good)}<span class="grow"><b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b> <span class="small muted">· ${awayText(c.to)}</span><div class="small ${left <= 1 ? 'dn' : 'muted'}">Due day ${c.due} (${left <= 0 ? 'today!' : left + ' days left'}) · you have ${have}/${c.qty} · late fine ${fmt(c.fine)}</div></span><span class="num up">${fmt(c.pay)}</span></div>`;
-    }).join('') : '<div class="muted">No active contracts.</div>';
-    let board = '';
-    if (!G.trip){
-      const o = G.offers[G.town];
-      board = o.con.map(c => `<div class="card row">${gImg(c.good)}<span class="grow">Deliver <b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b> <span class="small muted">· ${awayText(c.to)}</span><div class="small muted">By day ${c.due} · fine if late ${fmt(c.fine)} · you buy the goods</div></span><span class="num up">${fmt(c.pay)}</span><button class="btn go" data-a="take:${c.id}" ${G.contracts.length >= 4 ? 'disabled' : ''}>Accept</button></div>`).join('') || '<div class="muted">No work posted today.</div>';
-    }
-    return panelShell('Contracts', `${G.contracts.length}/4 active`, (G.trip ? '' : `<h3 style="margin:2px 0 6px">Job board</h3>${board}`) + `<h3 style="margin:10px 0 6px">Your contracts</h3>${act}<div class="small muted">Contracts pay automatically when you arrive with the goods.</div>`);
+    return panelShell('Contracts', `Seats ${paxUsed('std')}/${seats} · Luxury ${paxUsed('rich')}/${rich}`, top + below + '<div class="small muted" style="margin-top:6px">Fares and contract pay come in automatically when you arrive.</div>');
   },
   map(){
     const sel = tabs.map && tabs.map !== G.town ? tabs.map : null;
@@ -1772,13 +1780,15 @@ $('#panel').addEventListener('click', e => {
       for (; k < n && (G.cargo[g] || 0) > 0; k++){ const p = sellP(t, g); G.money += p; got += p; G.cargo[g]--; G.mk[t][g].press = clamp(G.mk[t][g].press + .028, -.6, .75); }
       if (!G.cargo[g]) { delete G.cargo[g]; delete G.paid[g]; }
       if (k){ const prof = got - (G.paid[g] || 0) * 0; G.stats.earned += got; floatText('+' + fmt(got), '#ffd166'); toast(`Sold ${k} ${GOOD[g].n} for ${fmt(got)}`, 'g'); } break; }
-    case 'board': { const o = G.offers[t], p = o.pax.find(q => q.id === +x); if (!p) break; o.pax.splice(o.pax.indexOf(p), 1); G.pax.push(p); toast(`${p.n} passenger${p.n > 1 ? 's' : ''} boarded for ${TOWN[p.to].n}`, 'g'); break; }
+    case 'board': { const o = G.offers[t], p = o.pax.find(q => q.id === +x); if (!p) break; const k = Math.min(p.n, seatsFree(p.cls)); if (k <= 0) break;
+      if (k < p.n){ G.pax.push({ ...p, id:G.cid++, n:k }); p.n -= k; toast(`${k} of the group boarded. ${p.n} keep waiting.`, 'g'); break; }
+      o.pax.splice(o.pax.indexOf(p), 1); G.pax.push(p); toast(`${p.n} passenger${p.n > 1 ? 's' : ''} boarded for ${TOWN[p.to].n}`, 'g'); break; }
     case 'take': { const o = G.offers[t], c = o.con.find(q => q.id === +x); if (!c || G.contracts.length >= 4) break; o.con.splice(o.con.indexOf(c), 1); G.contracts.push(c); toast('Contract accepted', 'g'); break; }
     case 'go': depart(x); return;
     case 'fuel': { const fp = fuelPrice(t), room = fuelCap() - G.fuel; let tons = x === 'fill' ? Math.min(room, Math.floor(G.money / fp * 10) / 10) : Math.min(1, room);
       if (tons > 0 && G.money >= Math.ceil(tons * fp)){ G.money -= Math.ceil(tons * fp); G.fuel = Math.min(fuelCap(), G.fuel + tons); G.mk[t].coal.press = clamp(G.mk[t].coal.press - .01 * tons, -.6, .75); toast(`Loaded ${tons.toFixed(1)} t of coal`, 'g'); } break; }
-    case 'reserve': { const T = G.trip; if (!T || T.reserved) break; const g = T.board.find(q => q.id === +x); if (!g || !fitsOnArrival(g)) break;
-      T.board.splice(T.board.indexOf(g), 1); T.reserved = g; toast(`Reserved ${g.n} to ${TOWN[g.to].n}. No changes now!`, 'g'); break; }
+    case 'reserve': { const T = G.trip; if (!T || T.reserved) break; let g = T.board.find(q => q.id === +x); if (!g || !fitsOnArrival(g)) break;
+      const k = Math.min(g.n, freeOnArrival(g.cls)); if (k < g.n){ T.reserved = { ...g, id:G.cid++, n:k }; g.n -= k; } else { T.board.splice(T.board.indexOf(g), 1); T.reserved = g; } g = T.reserved; toast(`Reserved ${g.n} to ${TOWN[g.to].n}. No changes now!`, 'g'); break; }
     case 'kick': { const k = G.pax.find(q => q.id === +x); if (!k) break; const cost = k.n * (k.cls === 'rich' ? 50 : 25); if (G.money < cost) break;
       G.money -= cost; G.pax.splice(G.pax.indexOf(k), 1); toast(`${k.n} passenger${k.n > 1 ? 's' : ''} kicked off. Refunded ${fmt(cost)}`, 'r'); break; }
     case 'turn': turnBack(); return;
@@ -2111,12 +2121,11 @@ function blackjack(who, rich){
 function makeGroup(from){
   const t = TOWN[from], to = pick(TOWNS.filter(x => x.id !== from)).id, d = route(from, to).d, rich = Math.random() < .2 + .06 * t.size;
   const life = 25 + Math.random() * 55;
-  return { id:G.cid++, to, cls:rich ? 'rich' : 'std', n:rich ? ri(1, 3) : ri(2, 9), fare:Math.round((10 + d * 1.15) * (rich ? rf(3, 4) : rf(.9, 1.2))), life, max:life };
+  return { id:G.cid++, to, cls:rich ? 'rich' : 'std', n:rich ? ri(2, 8) : ri(5, 20), fare:paxFare(from, to, rich), life, max:life };
 }
-function fitsOnArrival(g){
-  const T = G.trip, stay = G.pax.filter(p => p.cls === g.cls && p.to !== T.to).reduce((s, p) => s + p.n, 0);
-  return (g.cls === 'rich' ? richOf() : seatsOf()) - stay >= g.n;
-}
+// seats that will be free when you pull in (people getting off there free theirs up)
+function freeOnArrival(cls){ const T = G.trip, stay = G.pax.filter(p => p.cls === cls && p.to !== T.to).reduce((s, p) => s + p.n, 0); return (cls === 'rich' ? richOf() : seatsOf()) - stay; }
+const fitsOnArrival = g => freeOnArrival(g.cls) > 0;
 function boardTick(dt){
   const T = G.trip; if (!T || paused || G.paused) return;
   if (!T.board){ T.board = []; T.boardT = 0; }
@@ -2127,11 +2136,11 @@ function boardTick(dt){
 }
 function reservationBoard(){
   const T = G.trip, dest = TOWN[T.to].n;
-  const mine = T.reserved ? `<div class="card hl row"><span class="grow"><b>Reserved:</b> ${T.reserved.n} × ${T.reserved.cls === 'rich' ? '<b>Rich</b>' : 'Regular'} to <b>${TOWN[T.reserved.to].n}</b><div class="small muted">Locked in. They board when you reach ${dest}.</div></span><span class="num up">${fmt(T.reserved.fare * T.reserved.n)}</span></div>` : '';
+  const mine = '', _old = T.reserved && false ? `<div class="card hl row"><span class="grow"><b>Reserved:</b> ${T.reserved.n} × ${T.reserved.cls === 'rich' ? '<b>Rich</b>' : 'Regular'} to <b>${TOWN[T.reserved.to].n}</b><div class="small muted">Locked in. They board when you reach ${dest}.</div></span><span class="num up">${fmt(T.reserved.fare * T.reserved.n)}</span></div>` : '';
   const rows = T.board.length ? T.board.map(g => { const ok = !T.reserved && fitsOnArrival(g);
     return `<div class="card row"><span class="grow">${g.n} × ${g.cls === 'rich' ? '<b>Rich</b> <span class="tag e">LUXURY</span>' : 'Regular'} to <b>${TOWN[g.to].n}</b><div class="small muted">${fmt(g.fare)} each</div><div class="bar" style="max-width:140px;margin-top:2px"><i data-life="${g.id}" style="width:${g.life / g.max * 100}%;background:#e8b23a"></i></div></span>
-      <span class="num">${fmt(g.fare * g.n)}</span><button class="btn go" data-a="reserve:${g.id}" ${ok ? '' : 'disabled'}>${T.reserved ? 'Taken' : ok ? 'Reserve' : 'No seats'}</button></div>`; }).join('') : '<div class="muted">Nobody yet. Keep watching: travelers come and go.</div>';
-  return `<h3 style="margin:2px 0 4px">Live at ${dest} station</h3><div class="small muted" style="margin-bottom:6px">Reserve ONE group per trip. Once you reserve, you can't swap or cancel, so choose well. The bar is how long they'll wait.</div>${mine}${rows}`;
+      <span class="num">${fmt(g.fare * g.n)}</span><button class="btn go" data-a="reserve:${g.id}" ${ok ? '' : 'disabled'}>${T.reserved ? 'Taken' : !ok ? 'No seats' : freeOnArrival(g.cls) < g.n ? `Reserve ${freeOnArrival(g.cls)} of ${g.n} (${fmt(g.fare * freeOnArrival(g.cls))})` : 'Reserve'}</button></div>`; }).join('') : '<div class="muted">Nobody yet. Keep watching: travelers come and go.</div>';
+  return `<h3 style="margin:8px 0 4px">Passengers waiting at ${dest} (live)</h3><div class="small muted" style="margin-bottom:6px">Reserve ONE group per trip. No swapping or cancelling. Too many for your seats? Take part of the group at the same price per person.</div>${rows}`;
 }
 let boardSig = '';
 function liveBoard(){
@@ -2152,7 +2161,7 @@ function frame(now){
     requestTick(dt);
     boardTick(dt);
     drawScene();
-    hudT -= dt; if (hudT <= 0){ hudT = .25; refreshHud(); if (panelName === 'map' && G.trip) drawMap(); if (panelName === 'pax' && G.trip) liveBoard(); }
+    hudT -= dt; if (hudT <= 0){ hudT = .25; refreshHud(); if (panelName === 'map' && G.trip) drawMap(); if (panelName === 'jobs' && G.trip) liveBoard(); }
     saveT -= dt; if (saveT <= 0){ saveT = 5; save(); }
     newsTimer -= dt; if (newsTimer < 0) $('#news').style.opacity = 0;
     dispMoney += (G.money - dispMoney) * Math.min(1, dt * 6); if (Math.abs(G.money - dispMoney) < 1) dispMoney = G.money;
