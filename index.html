@@ -322,7 +322,7 @@ const TOWNS = [
   { id:'vega', n:'Las Vegas',     x:16.7, y:33.1, biome:'mojave', prod:['whiskey'],          size:1, law:0,   shady:1, roof:'#c0563a', lbl:'r' },
   { id:'phoe', n:'Phoenix',       x:21.9, y:39.8, biome:'saguaro', prod:['oranges','cotton'], size:1, law:.2,  roof:'#e08a2e', lbl:'b' },
   { id:'albu', n:'Albuquerque',   x:31.1, y:35.8, biome:'mesa', prod:['cattle','gold'],    size:1, law:.15, roof:'#b5651d', lbl:'b' },
-  { id:'chey', n:'Cheyenne',      x:34.2, y:20.7, biome:'prairie',   prod:['cattle','coal'],    size:1, law:.2,  roof:'#8a3a2a', lbl:'r' },
+  { id:'bois', n:'Boise',         x:14.9, y:14.6, biome:'rockies',   prod:['lumber','gold'],    size:1, law:.2,  roof:'#8a3a2a', lbl:'r' },
   { id:'denv', n:'Denver',        x:33.9, y:24.2, biome:'rockies',   prod:['gold','coal'],      size:2, law:.3,  bank:1, roof:'#2e4a73', lbl:'l' },
   { id:'kans', n:'Kansas City',   x:51.6, y:25.8, biome:'prairie', prod:['cattle','grain'],   size:3, law:.35, bank:1, shop:1, roof:'#b8322f', lbl:'b' },
   { id:'fort', n:'Fort Worth',    x:46.9, y:41.5, biome:'scrub', prod:['cattle','cotton'],  size:2, law:.25, roof:'#a8322e', lbl:'b' },
@@ -340,7 +340,7 @@ const TOWNS = [
 ];
 const TOWN = Object.fromEntries(TOWNS.map(t => [t.id, t]));
 // every city links to the cities near it, and no two lines of track cross
-const EDGES = [['seat','chey'],['chey','denv'],['chey','minn'],['seat','minn'],['sanf','seat'],['jack','sava'],['nyc','bost'],['sava','atla'],['pitt','detr'],['atla','char'],['atla','nash'],
+const EDGES = [['seat','bois'],['bois','denv'],['bois','minn'],['seat','minn'],['sanf','seat'],['jack','sava'],['nyc','bost'],['sava','atla'],['pitt','detr'],['atla','char'],['atla','nash'],
   ['sava','char'],['nash','cinc'],['cinc','pitt'],['cinc','detr'],['phoe','vega'],['jack','atla'],['phoe','albu'],['pitt','nyc'],['nash','char'],['cinc','char'],
   ['denv','albu'],['vega','sanf'],['pitt','char'],['vega','albu'],['minn','kans'],['nash','kans'],['nyc','detr'],['kans','fort'],['fort','albu'],['cinc','kans'],
   ['denv','kans'],['nyc','char'],['detr','minn'],['denv','vega']];
@@ -2186,6 +2186,16 @@ function boot(){
   G = load();
   let away = 0;
   if (G){
+    if (G.mk.chey){                                                              // Cheyenne was swapped for Boise
+      const fix = id => id === 'chey' ? 'denv' : id;
+      for (const b of G.biz.chey || []) G.money += b.owned * b.price;
+      delete G.mk.chey; delete G.biz.chey; delete G.offers.chey; delete G.seen.chey;
+      G.town = fix(G.town); G.pax.forEach(p => p.to = fix(p.to)); G.contracts.forEach(c => { c.to = fix(c.to); c.from = fix(c.from); });
+      for (const o of Object.values(G.offers)){ o.pax = o.pax.filter(p => p.to !== 'chey'); o.con = o.con.filter(c => c.to !== 'chey'); }
+      if (G.trip){ for (const p of G.trip.board || []) p.to = fix(p.to); if (G.trip.reserved) G.trip.reserved.to = fix(G.trip.reserved.to); }
+      G.pax = G.pax.filter(p => p.to !== G.town); G.contracts = G.contracts.filter(c => c.to !== c.from);
+      if (G.trip){ const T = G.trip; if (T.to === 'chey' || T.from === 'chey'){ T.from = fix(T.from); T.to = fix(T.to); T.path = [T.from, T.to]; if (T.from === T.to){ G.town = T.to; G.trip = null; } else { T.miles = legMiles(T.from, T.to); T.hours = T.miles / LOCOS[G.train.loco].mph; T.secs = T.hours * SEC_PER_HOUR; } } }
+    }
     for (const t of TOWNS) if (!G.mk[t.id]){ initTown(t); refreshOffers(t.id, true); }   // new towns on the map
     const sec = Math.min(8 * 3600, Math.max(0, (Date.now() - G.wall) / 1000));
     away = Math.round(incomePerHour() * sec / 3600);
