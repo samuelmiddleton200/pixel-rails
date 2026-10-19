@@ -340,7 +340,7 @@ const TOWNS = [
 ];
 const TOWN = Object.fromEntries(TOWNS.map(t => [t.id, t]));
 // every city links to the cities near it, and no two lines of track cross
-const EDGES = [['seat','bois'],['bois','denv'],['bois','minn'],['seat','minn'],['sanf','seat'],['jack','sava'],['nyc','bost'],['sava','atla'],['pitt','detr'],['atla','char'],['atla','nash'],
+const EDGES = [['seat','bois'],['bois','denv'],['bois','minn'],['seat','minn'],['bois','sanf'],['sanf','seat'],['jack','sava'],['nyc','bost'],['sava','atla'],['pitt','detr'],['atla','char'],['atla','nash'],
   ['sava','char'],['nash','cinc'],['cinc','pitt'],['cinc','detr'],['phoe','vega'],['jack','atla'],['phoe','albu'],['pitt','nyc'],['nash','char'],['cinc','char'],
   ['denv','albu'],['vega','sanf'],['pitt','char'],['vega','albu'],['minn','kans'],['nash','kans'],['nyc','detr'],['kans','fort'],['fort','albu'],['cinc','kans'],
   ['denv','kans'],['nyc','char'],['detr','minn'],['denv','vega']];
@@ -474,7 +474,8 @@ function oldSkill(role){                                       // mood changes h
 }
 const coalPrice = () => 11;
 const SEC_PER_HOUR = 10;
-const mphNow = () => loco().mph * (1 + .07 * skill('engineer')) * (G.train.cond < 50 ? .8 : 1);
+const carSlow = () => .9 ** G.train.cars.length;                 // every car you pull takes 10% off your speed
+const mphNow = () => loco().mph * carSlow() * (G.train.cond < 50 ? .8 : 1);
 const segTime = () => G.trip ? G.trip.secs / G.trip.segs : 6;          // real seconds between event checkpoints
 const hourOfDay = () => (G.day % 1) * 24;
 const todNow = () => ((hourOfDay() - 6) / 24 + 1) % 1;                   // 0 = 6 AM, .25 noon, .5 6 PM, .75 midnight
@@ -1219,7 +1220,7 @@ function update(dt){
     V.x = d.x0 + s - V.v * dt;                                   // the line below adds v*dt back
   }
   else if (G.trip){
-    const target = G.paused ? 0 : paused ? CRUISE * .35 : CRUISE * loco().speed;           // 30 mph = 1x, 45 = 1.5x, 60 = 2x, 85 = 2.8x
+    const target = G.paused ? 0 : paused ? CRUISE * .35 : CRUISE * loco().speed * carSlow();           // 30 mph = 1x, 45 = 1.5x, 60 = 2x, 85 = 2.8x
     V.v += (target - V.v) * Math.min(1, dt * (V.accel > 0 ? .9 : 1.5)); V.accel = Math.max(0, V.accel - dt);
   } else V.v = 0;
   V.x += V.v * dt;
@@ -1714,13 +1715,13 @@ const PANELS = {
     const L = loco(), tab = tabs.train;
     const carsList = G.train.cars.map((c, i) => `<div class="card row"><span class="grow"><b>${CARS[c].n}</b><div class="small muted">${CARS[c].desc}</div></span>${G.town && TOWN[G.town].shop ? `<button class="btn bad" data-a="sellcar:${i}">Sell ${fmt(CARS[c].price * .5)}</button>` : ''}</div>`).join('');
     const shop = G.town && TOWN[G.town].shop;
-    const buy = shop ? Object.entries(CARS).map(([k, c]) => `<div class="card row"><span class="grow"><b>${c.n}</b><div class="small muted">${c.desc}</div></span><button class="btn go" data-a="buycar:${k}" ${G.money < c.price || G.train.cars.length >= L.cars ? 'disabled' : ''}>${fmt(c.price)}</button></div>`).join('') : `<div class="muted">Buy cars and engines at a town with a train yard (${TOWNS.filter(x => x.shop).map(x => x.n).join(', ')}).</div>`;
+    const buy = shop ? Object.entries(CARS).map(([k, c]) => `<div class="card row"><span class="grow"><b>${c.n}</b><div class="small muted">${c.desc} <span class="dn">Slows the train 10%.</span></div></span><button class="btn go" data-a="buycar:${k}" ${G.money < c.price || G.train.cars.length >= L.cars ? 'disabled' : ''}>${fmt(c.price)}</button></div>`).join('') : `<div class="muted">Buy cars and engines at a town with a train yard (${TOWNS.filter(x => x.shop).map(x => x.n).join(', ')}).</div>`;
     const next = LOCOS[G.train.loco + 1];
     const cost = Math.ceil((100 - G.train.cond) * 3.2);
     return panelShell('Train', `${L.n} · ${G.train.cars.length}/${L.cars} cars`, `
       <div class="card row"><span class="grow"><b>Condition ${Math.round(G.train.cond)}%</b><div class="bar" style="margin-top:3px"><i style="width:${G.train.cond}%;background:${G.train.cond < 40 ? '#b8322f' : G.train.cond < 70 ? '#e8b23a' : '#3f8a3e'}"></i></div><div class="small muted">Below 50% the train runs slow and breaks down more.</div></span>
         ${G.town ? `<button class="btn" data-a="repair" ${cost < 1 || G.money < cost ? 'disabled' : ''}>Repair ${fmt(cost)}</button>` : ''}</div>
-      <div class="card"><b>Engine: ${L.n}</b> <span class="small muted">${L.mph} mph · up to ${L.cars} cars · tank ${L.tank} t · burns ${burnPer100().toFixed(1)} t per 100 mi</span>
+      <div class="card"><b>Engine: ${L.n}</b> <span class="small muted">${L.mph} mph (<b>${Math.round(mphNow())} mph</b> pulling ${G.train.cars.length} car${G.train.cars.length === 1 ? '' : 's'}, −10% each) · up to ${L.cars} cars · tank ${L.tank} t · burns ${burnPer100().toFixed(1)} t per 100 mi</span>
         ${next ? `<div class="row" style="margin-top:4px"><span class="grow small">Next: <b>${next.n}</b> (${next.mph} mph, ${next.cars} cars)</span>${shop ? `<button class="btn gold" data-a="loco" ${G.money < next.price ? 'disabled' : ''}>${fmt(next.price)}</button>` : `<span class="small muted">${fmt(next.price)} at a train yard</span>`}</div>` : '<div class="small">The finest engine on the rails.</div>'}</div>
       <h3 style="margin:8px 0 6px">Your cars</h3>${carsList}
       <h3 style="margin:8px 0 6px">Train yard</h3>${buy}`);
