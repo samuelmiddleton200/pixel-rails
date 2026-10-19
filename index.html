@@ -322,7 +322,8 @@ const TOWNS = [
   { id:'vega', n:'Las Vegas',     x:16.7, y:33.1, biome:'mojave', prod:['whiskey'],          size:1, law:0,   shady:1, roof:'#c0563a', lbl:'r' },
   { id:'phoe', n:'Phoenix',       x:21.9, y:39.8, biome:'saguaro', prod:['oranges','cotton'], size:1, law:.2,  roof:'#e08a2e', lbl:'b' },
   { id:'albu', n:'Albuquerque',   x:31.1, y:35.8, biome:'mesa', prod:['cattle','gold'],    size:1, law:.15, roof:'#b5651d', lbl:'b' },
-  { id:'denv', n:'Denver',        x:33.9, y:24.2, biome:'rockies',   prod:['gold','coal'],      size:2, law:.3,  bank:1, roof:'#2e4a73', lbl:'t' },
+  { id:'chey', n:'Cheyenne',      x:34.2, y:20.7, biome:'prairie',   prod:['cattle','coal'],    size:1, law:.2,  roof:'#8a3a2a', lbl:'r' },
+  { id:'denv', n:'Denver',        x:33.9, y:24.2, biome:'rockies',   prod:['gold','coal'],      size:2, law:.3,  bank:1, roof:'#2e4a73', lbl:'l' },
   { id:'kans', n:'Kansas City',   x:51.6, y:25.8, biome:'prairie', prod:['cattle','grain'],   size:3, law:.35, bank:1, shop:1, roof:'#b8322f', lbl:'b' },
   { id:'fort', n:'Fort Worth',    x:46.9, y:41.5, biome:'scrub', prod:['cattle','cotton'],  size:2, law:.25, roof:'#a8322e', lbl:'b' },
   { id:'minn', n:'Minneapolis',   x:53.8, y:11.2, biome:'northwoods',   prod:['grain','lumber'],   size:2, law:.25, roof:'#3f7fb8', lbl:'t' },
@@ -339,7 +340,7 @@ const TOWNS = [
 ];
 const TOWN = Object.fromEntries(TOWNS.map(t => [t.id, t]));
 // every city links to the cities near it, and no two lines of track cross
-const EDGES = [['seat','denv'],['seat','minn'],['sanf','seat'],['jack','sava'],['nyc','bost'],['sava','atla'],['pitt','detr'],['atla','char'],['atla','nash'],
+const EDGES = [['seat','chey'],['chey','denv'],['chey','minn'],['seat','minn'],['sanf','seat'],['jack','sava'],['nyc','bost'],['sava','atla'],['pitt','detr'],['atla','char'],['atla','nash'],
   ['sava','char'],['nash','cinc'],['cinc','pitt'],['cinc','detr'],['phoe','vega'],['jack','atla'],['phoe','albu'],['pitt','nyc'],['nash','char'],['cinc','char'],
   ['denv','albu'],['vega','sanf'],['pitt','char'],['vega','albu'],['minn','kans'],['nash','kans'],['nyc','detr'],['kans','fort'],['fort','albu'],['cinc','kans'],
   ['denv','kans'],['nyc','char'],['detr','minn'],['denv','vega']];
@@ -409,23 +410,25 @@ function newGame(){
     train:{ loco:0, cars:['freight','coach'], cond:100 }, crew:[], loan:0, shares:{}, events:[], news:[], mk:{}, offers:{},
     seen:{}, biz:{}, wageDays:0, fuel:12, wall:Date.now(), stats:{ trips:0, earned:0, best:0 }, cid:1, nextNewsDay:2 };
   // markets: every world rolls its own prices, so nobody knows the best route ahead of time
-  for (const t of TOWNS){
-    const m = {}; G.mk[t.id] = m;
-    for (const g of GOODS) m[g.id] = { mult:rf(.85, 1.2), drift:0, press:0 };
-    for (const g of t.prod) m[g].mult = rf(.5, .8);
-    const others = shuffle(GOODS.map(g => g.id).filter(g => !t.prod.includes(g)));
-    others.slice(0, ri(3, 4)).forEach(g => m[g].mult = rf(1.3, 2.5));
-    m.moon = { mult: t.shady ? .45 : rf(1.9, 2.8), drift:0, press:0 };
-    // investments
-    G.biz[t.id] = t.prod.map((g, i) => {
-      const price = Math.round(rf(250, 520) * (GOOD[g].base / 30 + 1) / 10) * 10;
-      return { id:t.id + i, n:BIZ[g], price, rate:rf(.07, .13), owned:0 };
-    });
-  }
+  for (const t of TOWNS) initTown(t);
   TOWNS.forEach(t => refreshOffers(t.id, true));
   R = Math.random;
   G.news.unshift({ day:1, txt:'Welcome to the rails! Buy low where goods are made, sell high where they are wanted.' });
   noteSeen(START);
+}
+// a town's market and businesses (also fills in towns added after a save was made)
+function initTown(t){
+  const m = {}; G.mk[t.id] = m;
+  for (const g of GOODS) m[g.id] = { mult:rf(.85, 1.2), drift:0, press:0 };
+  for (const g of t.prod) m[g].mult = rf(.5, .8);
+  const others = shuffle(GOODS.map(g => g.id).filter(g => !t.prod.includes(g)));
+  others.slice(0, ri(3, 4)).forEach(g => m[g].mult = rf(1.3, 2.5));
+  m.moon = { mult: t.shady ? .45 : rf(1.9, 2.8), drift:0, press:0 };
+  // investments
+  G.biz[t.id] = t.prod.map((g, i) => {
+    const price = Math.round(rf(250, 520) * (GOOD[g].base / 30 + 1) / 10) * 10;
+    return { id:t.id + i, n:BIZ[g], price, rate:rf(.07, .13), owned:0 };
+  });
 }
 
 function save(){ if (!G) return; G.wall = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) {} }
@@ -2183,6 +2186,7 @@ function boot(){
   G = load();
   let away = 0;
   if (G){
+    for (const t of TOWNS) if (!G.mk[t.id]){ initTown(t); refreshOffers(t.id, true); }   // new towns on the map
     const sec = Math.min(8 * 3600, Math.max(0, (Date.now() - G.wall) / 1000));
     away = Math.round(incomePerHour() * sec / 3600);
     if (away > 0){ G.money += away; G.stats.earned += away; }
