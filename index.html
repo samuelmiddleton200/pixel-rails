@@ -1175,7 +1175,7 @@ function lightAt(tod){
 
 function update(dt){
   // trip clock
-  if (G.trip && !paused && !G.paused){
+  if (G.trip && !paused && !G.paused && !(V.reqOpen && G.trip.el >= segTime())){
     const T = G.trip;
     T.el += dt;
     advanceDay(dt / SEC_PER_HOUR / 24);
@@ -1197,7 +1197,7 @@ function update(dt){
       }
     }
     setBiome(V.decel ? TOWN[T.to].biome : sceneryAt(T));
-    if (T.el >= segTime()) segmentDone();
+    if (T.el >= segTime() && !V.reqOpen) segmentDone();           // a stop or road event waits for the passenger popup to close
   }
   // speed
   if (V.decel){
@@ -1401,7 +1401,7 @@ function drawTrain(night){
     if (['coach', 'luxury'].includes(type)) drawRiders(type, x, y, i);
     if (type === 'luxury') for (let k = 0; k < 4; k++) V.glows.push([x + 7 + k * 14, y + 11, 7, 9]);
     else if (type === 'coach' || type === 'dining') for (let k = 0; k < 5; k++) V.glows.push([x + 5 + k * 11, y + 11, 7, 9]);
-    if (V.req && V.req.car === i && G.trip) drawRequestBubble(x, y);
+    if (V.req && V.req.car === i && G.trip && !V.reqOpen) drawRequestBubble(x, y);
   }
   // loco
   const ly = base - L.height - 4 + bob;
@@ -1954,7 +1954,7 @@ function drawRequestBubble(x, y){
 const carOnScreen = i => trainFront() - sprites.loco.width - (i + 1) * (CAR_W + 3) + CAR_W / 2 > 8;
 function riderCars(){ const out = []; G.train.cars.forEach((c, i) => { if (!carOnScreen(i)) return; if (c === 'coach' && paxUsed('std') > G.train.cars.slice(0, i).filter(q => q === 'coach').length * 10) out.push(i); if (c === 'luxury' && paxUsed('rich') > G.train.cars.slice(0, i).filter(q => q === 'luxury').length * 6) out.push(i); }); return out; }
 function requestTick(dt){
-  if (V.req){ if (!G.paused) V.req.life -= dt; if (V.req.life <= 0 || V.decel || !G.trip){ if (V.req.life <= 0) toast('The passenger gave up waiting.'); V.req = null; } return; }
+  if (V.req){ if (!G.paused && !V.reqOpen) V.req.life -= dt; if (!V.reqOpen && (V.req.life <= 0 || V.decel || !G.trip)){ if (V.req.life <= 0) toast('The passenger gave up waiting.'); V.req = null; } return; }
   if (!G.trip || paused || G.paused || V.decel || !$('#modal').hidden) return;
   const cars = riderCars(); if (!cars.length) return;
   V.reqT = (V.reqT == null ? 8 : V.reqT) - dt;
@@ -2000,7 +2000,7 @@ function triviaQ(){
 }
 function openRequest(force){
   if (!V.req || V.decel) return;
-  const req = V.req; paused = true;
+  const req = V.req; V.reqOpen = true;                         // the train keeps rolling while you play
   const kinds = [['trivia', 3], ['dice', 2], ['blackjack', 2], ['drink', 2], ['tip', 1], ['dodger', req.rich ? 0 : 1], ['complaint', 1], ['buy', cargoKeys().length ? 3 : 0]];
   const tot = kinds.reduce((s, k) => s + k[1], 0); let q = Math.random() * tot, kind = 'trivia'; for (const [k, w] of kinds){ q -= w; if (q <= 0){ kind = k; break; } }
   if (force) kind = force;
@@ -2042,7 +2042,7 @@ function openRequest(force){
   } else if (kind === 'dice') diceGame(who, rich);
   else blackjack(who, rich);
 }
-function endRequest(){ closeModal(); V.req = null; paused = false; save(); refreshHud(); rerender(); }
+function endRequest(){ closeModal(); V.req = null; V.reqOpen = false; save(); refreshHud(); rerender(); }
 function betChoices(rich){ return [10, 25, 50, 100].map(v => v * (rich > 1 ? 2 : 1)).filter(v => v <= Math.max(10, G.money)); }
 
 // ---- dice: the passenger offers bets ("bet $45 to win $100 that it's 3 or more"); some offers are generous, some are rip-offs ----
