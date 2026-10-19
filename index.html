@@ -2048,14 +2048,16 @@ function betChoices(rich){ return [10, 25, 50, 100].map(v => v * (rich > 1 ? 2 :
 // ---- dice: the passenger offers bets ("bet $45 to win $100 that it's 3 or more"); some offers are generous, some are rip-offs ----
 function diceGame(who, rich){
   const CONDS = [
-    ...[2, 3, 4, 5, 6].map(k => [`${k} or more`, v => v >= k, (7 - k) / 6]),
-    ...[1, 2, 3, 4, 5].map(k => [`${k} or less`, v => v <= k, k / 6]),
+    ...[3, 4, 5, 6].map(k => [k === 6 ? 'a 6' : `${k} or more`, v => v >= k, (7 - k) / 6]),
+    ...[1, 2, 3, 4].map(k => [k === 1 ? 'a 1' : `${k} or less`, v => v <= k, k / 6]),
     ...[1, 2, 3, 4, 5, 6].map(k => [`exactly ${k}`, v => v === k, 1 / 6]),
     ['an even number', v => v % 2 === 0, .5], ['an odd number', v => v % 2 === 1, .5],
   ];
   const offer = () => {
     const [txt, test, p] = pick(CONDS), stake = Math.max(5, Math.round(rf(8, 60) * rich / 5) * 5);
-    const fair = stake * (1 - p) / p, win = Math.max(5, Math.round(fair * (rf(.6, 1.4) + .05 * skill('dealer')) / 5) * 5);   // the passenger's offer can be good or bad
+    // "win" is the whole payout. fair = stake / chance; offers run from slightly bad to good, now and then great
+    const q = Math.random(), m = q < .3 ? rf(.82, .95) : q < .65 ? rf(.95, 1.08) : q < .95 ? rf(1.1, 1.6) : rf(1.7, 2.1);
+    const win = Math.max(stake + 5, Math.round(stake / p * m / 5) * 5);
     return { txt, test, stake, win };
   };
   const face = v => `<span class="die">${v}</span>`;
@@ -2074,8 +2076,8 @@ function diceGame(who, rich){
     const spin = setInterval(() => { const m = $('#modal .die'); if (m) m.textContent = ri(1, 6); if (++k > 8){ clearInterval(spin); finish(o, v); } }, 70);
   };
   const finish = (o, v) => {
-    const won = o.test(v); if (won) G.money += o.stake + o.win;
-    modal(`<h3>${won ? 'You win!' : 'Passenger wins'}</h3><div class="t" style="text-align:center">${face(v)}<div style="margin-top:6px">Needed ${o.txt}: ${won ? `<b class="up">+${fmt(o.win)}</b>` : `<b class="dn">-${fmt(o.stake)}</b>`}</div></div>
+    const won = o.test(v); if (won) G.money += o.win;
+    modal(`<h3>${won ? 'You win!' : 'Passenger wins'}</h3><div class="t" style="text-align:center">${face(v)}<div style="margin-top:6px">Needed ${o.txt}: ${won ? `you get <b class="up">${fmt(o.win)}</b> (+${fmt(o.win - o.stake)})` : `<b class="dn">-${fmt(o.stake)}</b>`}</div></div>
       <div class="ch"><button class="btn go" data-again>Another roll</button><button class="btn" data-x>That's enough</button></div>`,
       e => { if (e.target.closest('[data-again]')) draw(); else if (e.target.closest('[data-x]')) endRequest(); });
     refreshHud();
