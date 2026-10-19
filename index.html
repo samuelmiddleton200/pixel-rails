@@ -499,12 +499,16 @@ function refreshOffers(tid, full){
     o.pax.push({ id:G.cid++, to, cls:rich ? 'rich' : 'std', n:rich ? ri(2, 8) : ri(5, 20), fare:paxFare(tid, to, rich) });
   }
   // contracts
-  o.con = o.con.filter(() => !full && R() < .6);
+  o.con = o.con.filter(c => !full && R() < .6 && spareDays(c) >= 0);          // drop jobs you can no longer make in time
   while (o.con.length < 1 + Math.min(2, t.size)){
     const to = pick(others).id, g = pick(GOODS), qty = Math.min(ri(4, 14) - (g.base > 100 ? 2 : 0), Math.max(4, capOf())), d = route(tid, to).d;   // never more than your freight cars hold
-    const due = Math.floor(G.day) + Math.ceil(pathMiles(route(tid, to).path) / LOCOS[0].mph / 24) + ri(2, 5);
-    const pay = Math.round((qty * g.base * rf(1.4, 2.0) + d * 4) / 5) * 5;
-    o.con.push({ id:G.cid++, from:tid, to, good:g.id, qty, due, pay, fine:Math.round(pay * .35 / 5) * 5 });
+    // pay = the goods back (+15%) plus a haul fee per crate that, like a fare, grows with every mile (a bit above a seat,
+    // since you front the money and race a deadline). the tighter the deadline for YOUR engine, the bigger the bonus
+    const mi = pathMiles(route(tid, to).path), slack = pick([0, 1, 1, 2, 2, 3, 3, 4]);
+    const due = Math.floor(G.day) + Math.ceil(mi / mphNow() / 24) + slack;
+    const rush = [1.8, 1.5, 1.3, 1.15, 1.0][slack];
+    const pay = Math.round((qty * g.base * 1.15 + qty * (10 + mi * .12) * rush * rf(.92, 1.08)) / 5) * 5;
+    o.con.push({ id:G.cid++, from:tid, to, good:g.id, qty, due, pay, slack, fine:Math.round(pay * (slack ? .35 : .5) / 5) * 5 });
   }
   // crew for hire
   o.hire = o.hire.filter(() => !full && R() < .5);
@@ -513,6 +517,9 @@ function refreshOffers(tid, full){
     o.hire.push({ id:G.cid++, role, name:pick(FIRST) + ' ' + pick(LAST), skill:sk, wage:sk * 9 + ri(4, 10), mood:ri(60, 80), look:ri(0, 9999) });
   }
 }
+
+// days you could lose and still deliver on time, from where the job is posted, with your engine
+function spareDays(c){ return c.due - Math.floor(G.day) - Math.ceil(pathMiles(route(c.from, c.to).path) / mphNow() / 24); }
 
 // ---- days pass only while the train is moving ----
 const NEWS = [
@@ -1667,7 +1674,7 @@ const PANELS = {
         const label = k >= p.n ? 'Board' : k > 0 ? `Take ${k} of ${p.n} (${fmt(p.fare * k)})` : p.cls === 'rich' && !rich ? 'Need luxury car' : 'No seats';
         return `<div class="card row"><span class="jicon">${p.cls === 'rich' ? '🎩' : '🧳'}</span><span class="grow"><b>${p.n} ${p.cls === 'rich' ? 'rich passenger' : 'passenger'}${p.n > 1 ? 's' : ''}</b> to <b>${TOWN[p.to].n}</b><div class="small muted">${awayText(p.to)} · ${fmt(p.fare)} each</div></span>
           <span class="num">${fmt(p.fare * p.n)}</span><button class="btn go" data-a="board:${p.id}" ${k > 0 ? '' : 'disabled'}>${label}</button></div>`; }).join('') : '<div class="muted">Nobody waiting right now.</div>';
-      const freight = o.con.map(c => `<div class="card row">${gImg(c.good)}<span class="grow">Deliver <b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b><div class="small muted">${awayText(c.to)} · by day ${c.due} · late fine ${fmt(c.fine)} · you buy the goods</div></span><span class="num up">${fmt(c.pay)}</span><button class="btn go" data-a="take:${c.id}" ${G.contracts.length >= 4 ? 'disabled' : ''}>Accept</button></div>`).join('') || '<div class="muted">No freight jobs today.</div>';
+      const freight = o.con.map(c => `<div class="card row">${gImg(c.good)}<span class="grow">Deliver <b>${c.qty} ${GOOD[c.good].n}</b> to <b>${TOWN[c.to].n}</b><div class="small muted">${awayText(c.to)} · by day ${c.due} · late fine ${fmt(c.fine)} · you buy the goods</div>${c.slack != null ? (sp => `<div class="small ${sp <= 1 ? 'dn' : 'muted'}">${sp <= 0 ? '⚡ RUSH: leave now, no spare days' : sp === 1 ? '⏱ Tight: 1 spare day' : sp + ' spare days'}${['  ·  +80% pay', '  ·  +50% pay', '  ·  +30% pay', '  ·  +15% pay', ''][c.slack]}</div>`)(Math.max(0, spareDays(c))) : ''}</span><span class="num up">${fmt(c.pay)}</span><button class="btn go" data-a="take:${c.id}" ${G.contracts.length >= 4 ? 'disabled' : ''}>Accept</button></div>`).join('') || '<div class="muted">No freight jobs today.</div>';
       below = `<h3 style="margin:10px 0 6px">Passengers at ${TOWN[G.town].n}</h3>${people}<h3 style="margin:10px 0 6px">Freight jobs <span class="small muted">(${G.contracts.length}/4 taken)</span></h3>${freight}`;
     }
     return panelShell('Contracts', `Seats ${paxUsed('std')}/${seats} · Luxury ${paxUsed('rich')}/${rich}`, top + below + '<div class="small muted" style="margin-top:6px">Fares and contract pay come in automatically when you arrive.</div>');
@@ -2193,7 +2200,7 @@ addEventListener('resize', () => { resize(); if (panelName === 'map') drawMap();
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else if (G){ const sec = Math.min(8 * 3600, Math.max(0, (Date.now() - G.wall) / 1000)); if (sec > 30){ const v = Math.round(incomePerHour() * sec / 3600); if (v > 0){ G.money += v; toast(`Your businesses earned ${fmt(v)} while you were away`, 'g'); } } G.wall = Date.now(); } });
 addEventListener('pagehide', save);
 // test hooks
-window.__pr = { get G(){ return G; }, V, sceneryAt, openRequest,
+window.__pr = { get G(){ return G; }, V, TOWNS, GOODS, route, pathMiles, paxFare, buyP, sellP, legMiles, sceneryAt, openRequest,
   cargoShot:list => { const saved = bx, keep = G.cargo, c = mk(68 * list.length, 34); bx = c.getContext("2d"); bx.fillStyle = "#9fd0f0"; bx.fillRect(0, 0, c.width, c.height); list.forEach(([g, n], i) => { G.cargo = { [g]:n }; drawCargo(i * 68 + 4, 6, 0); bx.drawImage(sprites.cars.freight, i * 68 + 4, 6); }); bx = saved; G.cargo = keep; return c.toDataURL(); }, pickMap:id => { tabs.map = id; renderPanel(); }, depart, openPanel, closePanel, segmentDone, roadEvent, refreshHud, newGame:() => { newGame(); buildSprites(); V.arrive(G.town); } };
 boot();
 })();
