@@ -375,7 +375,7 @@ const LOCOS = [
   { n:'Prairie Runner',  mph:55,  tank:14, speed:1.375, cars:5,  coal:1.2, price:5000,  col:'#2d4a3a', trim:'#d6a83c' },
   { n:'Iron Duke',       mph:70,  tank:18, speed:1.75,  cars:7,  coal:1.5, price:20000, col:'#3a2d4a', trim:'#d6a83c' },
   { n:'Silver Comet',    mph:90,  tank:24, speed:2.25,  cars:10, coal:1.8, price:60000, col:'#5a6478', trim:'#e8eef7' },
-  { n:'Bullet Train',    mph:125, tank:30, speed:3.125, cars:12, coal:2.2, price:150000, col:'#eef2f6', trim:'#2a6fd6', bullet:1, desc:'Electric nose, no smoke, 125 mph.' },
+  { n:'Bullet Train',    mph:1000, tank:30, speed:25, cars:12, coal:2.2, price:40000, col:'#eef2f6', trim:'#2a6fd6', bullet:1, desc:'Electric nose, no smoke, 1,000 mph.' },
 ];
 const CARS = {
   freight: { n:'Freight Car',  price:450,  cap:10,  desc:'Holds 10 crates of cargo.' },
@@ -1220,7 +1220,7 @@ function update(dt){
     // it is timed so the stop lands exactly when the trip clock runs out
     if (!V.decel){
       const left = (T.segs - T.seg - 1) * segTime() + (segTime() - T.el);
-      const v0 = Math.max(20, V.v), D = 2.6 + 1.7 * (loco().speed - 1), stopX = stationStopX(), dist = BW + 12 - stopX;   // faster engines brake earlier
+      const fast = loco().speed > 5, v0 = Math.max(20, V.v, fast ? CRUISE * loco().speed * carSlow() : 0), D = fast ? Math.min(2.2, T.secs * .3) : 2.6 + 1.7 * (loco().speed - 1), stopX = stationStopX(), dist = BW + 12 - stopX;   // faster engines brake earlier
       const cruise = Math.max(0, (dist - v0 * D / 2) / v0);
       if (left <= cruise + D){
         const Dd = Math.min(D, left * .95);
@@ -1245,7 +1245,7 @@ function update(dt){
   }
   else if (G.trip){
     const target = G.paused ? 0 : paused ? CRUISE * .35 : CRUISE * loco().speed * carSlow();           // 40 mph = 1x, 55 = 1.4x, 70 = 1.75x, 90 = 2.25x, 125 = 3.1x
-    V.v += (target - V.v) * Math.min(1, dt * (V.accel > 0 ? .9 : 1.5)); V.accel = Math.max(0, V.accel - dt);
+    V.v += (target - V.v) * Math.min(1, dt * (V.accel > 0 ? .9 : 1.5) * (loco().speed > 5 ? 4 : 1));   // the 1,000 mph Bullet launches hard V.accel = Math.max(0, V.accel - dt);
   } else V.v = 0;
   V.x += V.v * dt;
   V.bobX = (V.bobX || 0) + Math.min(V.v, CRUISE) * dt;   // the rock-and-bounce keeps Little Rusty's rhythm on every engine
